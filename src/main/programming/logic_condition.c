@@ -343,6 +343,30 @@ static int logicConditionCompute(
             return false;
             break;
         }
+        case LOGIC_CONDITION_SET_VTX_CUSTOM_SLOT:
+        {
+            // operandA encodes band*8+channel (1-based), operandB is power index
+            uint8_t slot = constrain(operandA, 1, 40);
+            uint8_t newBand = ((slot - 1) / 8) + 1;
+            uint8_t newChannel = ((slot - 1) % 8) + 1;
+
+            vtxSettingsConfigMutable()->frequencyGroup = FREQUENCYGROUP_3G3;
+
+            if (newBand != vtxSettingsConfig()->band || newChannel != vtxSettingsConfig()->channel) {
+                vtxSettingsConfigMutable()->band = newBand;
+                vtxSettingsConfigMutable()->channel = newChannel;
+                if (vtxCommonDevice()) {
+                    vtxCommonSetBandAndChannel(vtxCommonDevice(), newBand, newChannel);
+                }
+            }
+
+            if (operandB > 0 && operandB <= 3) {
+                vtxSettingsConfigMutable()->power = operandB;
+            }
+
+            return slot;
+            break;
+        }
 #endif
 
         case LOGIC_CONDITION_SET_GIMBAL_SENSITIVITY:
