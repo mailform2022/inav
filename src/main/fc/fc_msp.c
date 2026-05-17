@@ -1806,6 +1806,27 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
         }
         break;
 
+#ifdef USE_VTX_CONTROL
+    case MSP2_INAV_VTX_TABLE_CUSTOM:
+        {
+            // Send 3.3GHz SX33 frequency table to configurator
+            sbufWriteU8(dst, 5);  // band count
+            sbufWriteU8(dst, 8);  // channel count
+            sbufWriteU8(dst, 3);  // power level count
+            for (uint8_t band = 0; band < 5; band++) {
+                sbufWriteU8(dst, vtx3G3BandLetter[band + 1]);
+                for (uint8_t ch = 0; ch < 8; ch++) {
+                    sbufWriteU16(dst, vtx3G3frequencyTable[band][ch]);
+                }
+            }
+            // Power levels: 25, 2000, 5000 mW
+            sbufWriteU16(dst, 25);
+            sbufWriteU16(dst, 2000);
+            sbufWriteU16(dst, 5000);
+        }
+        break;
+#endif
+
     default:
         return false;
     }
@@ -2918,6 +2939,28 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
             }
         } else {
             return MSP_RESULT_ERROR;
+        }
+        break;
+
+    case MSP2_INAV_SET_VTX_TABLE_CUSTOM:
+        {
+            // Receive custom VTX table from configurator
+            // Format: band(u8), channel(u8), power(u8)
+            if (dataSize >= 2) {
+                uint8_t newBand = sbufReadU8(src);
+                uint8_t newChannel = sbufReadU8(src);
+                if (newBand > 0 && newBand <= 5 && newChannel > 0 && newChannel <= 8) {
+                    vtxSettingsConfigMutable()->band = newBand;
+                    vtxSettingsConfigMutable()->channel = newChannel;
+                    vtxSettingsConfigMutable()->frequencyGroup = FREQUENCYGROUP_3G3;
+                    if (sbufBytesRemaining(src) >= 1) {
+                        uint8_t newPower = sbufReadU8(src);
+                        vtxSettingsConfigMutable()->power = newPower;
+                    }
+                }
+            } else {
+                return MSP_RESULT_ERROR;
+            }
         }
         break;
 #endif

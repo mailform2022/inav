@@ -67,6 +67,7 @@ typedef enum {
     FREQUENCYGROUP_5G8 = 0,
     FREQUENCYGROUP_2G4 = 1,
     FREQUENCYGROUP_1G3 = 2,
+    FREQUENCYGROUP_3G3 = 3,
 } vtxFrequencyGroups_e;
 
 struct vtxVTable_s;

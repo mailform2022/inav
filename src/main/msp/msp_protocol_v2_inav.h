@@ -125,4 +125,7 @@
 #define MSP2_INAV_SET_GEOZONE_VERTEX            0x2213
 #define MSP2_INAV_SET_GVAR                      0x2214
 
+#define MSP2_INAV_VTX_TABLE_CUSTOM              0x2F00
+#define MSP2_INAV_SET_VTX_TABLE_CUSTOM          0x2F01
+
 #define MSP2_INAV_FULL_LOCAL_POSE               0x2220
