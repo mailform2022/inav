@@ -1657,12 +1657,24 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
             }
         }
         break;
+#endif
+
+#if defined(USE_VTX_CONTROL)
+    case MSP2_INAV_VTX_TABLE_CUSTOM:
+        {
+            sbufWriteU8(dst, vtxSettingsConfig()->band);
+            sbufWriteU8(dst, vtxSettingsConfig()->channel);
+            sbufWriteU8(dst, vtxSettingsConfig()->power);
+            sbufWriteU8(dst, vtxSettingsConfig()->frequencyGroup);
+        }
+        break;
+#endif
+
     default:
         return false;
     }
     return true;
 }
-#endif
 
 #ifdef USE_SAFE_HOME
 static mspResult_e mspFcSafeHomeOutCommand(sbuf_t *dst, sbuf_t *src)
@@ -2645,6 +2657,17 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
                     }
                 }
             }
+        } else {
+            return MSP_RESULT_ERROR;
+        }
+        break;
+
+    case MSP2_INAV_SET_VTX_TABLE_CUSTOM:
+        if (dataSize >= 4) {
+            vtxSettingsConfigMutable()->band = sbufReadU8(src);
+            vtxSettingsConfigMutable()->channel = sbufReadU8(src);
+            vtxSettingsConfigMutable()->power = sbufReadU8(src);
+            vtxSettingsConfigMutable()->frequencyGroup = sbufReadU8(src);
         } else {
             return MSP_RESULT_ERROR;
         }

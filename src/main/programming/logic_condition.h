@@ -82,7 +82,8 @@ typedef enum {
     LOGIC_CONDITION_DELTA                       = 50,
     LOGIC_CONDITION_APPROX_EQUAL                = 51,
     LOGIC_CONDITION_LED_PIN_PWM                 = 52,
-    LOGIC_CONDITION_LAST                        = 53,
+    LOGIC_CONDITION_SET_VTX_CUSTOM_SLOT         = 53,
+    LOGIC_CONDITION_LAST                        = 54,
 } logicOperation_e;
 
 typedef enum logicOperandType_s {

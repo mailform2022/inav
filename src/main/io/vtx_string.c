@@ -33,6 +33,10 @@
 #define VTX_STRING_1G3_CHAN_COUNT  8
 #define VTX_STRING_1G3_POWER_COUNT 3
 
+#define VTX_STRING_3G3_BAND_COUNT  5
+#define VTX_STRING_3G3_CHAN_COUNT   8
+#define VTX_STRING_3G3_POWER_COUNT 3
+
 const uint16_t vtx58frequencyTable[VTX_STRING_5G8_BAND_COUNT][VTX_STRING_5G8_CHAN_COUNT] =
 {
     { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725 }, // A
@@ -51,7 +55,7 @@ const char * const vtx58BandNames[VTX_STRING_5G8_BAND_COUNT + 1] = {
     "R",
 };
 
-const char vtx58BandLetter[VTX_STRING_5G8_BAND_COUNT + 1] = "-ABEFR";
+const char vtx58BandLetter[VTX_STRING_5G8_BAND_COUNT + 1] = {'-', 'A', 'B', 'E', 'F', 'R'};
 
 const char * const vtx58ChannelNames[VTX_STRING_5G8_CHAN_COUNT + 1] = {
     "-", "1", "2", "3", "4", "5", "6", "7", "8",
@@ -73,7 +77,7 @@ const char * const vtx1G3BandNames[VTX_STRING_1G3_BAND_COUNT + 1] = {
     "B",
 };
 
-const char vtx1G3BandLetter[VTX_STRING_1G3_BAND_COUNT + 1] = "-AB";
+const char vtx1G3BandLetter[VTX_STRING_1G3_BAND_COUNT + 1] = {'-', 'A', 'B'};
 
 const char * const vtx1G3ChannelNames[VTX_STRING_1G3_CHAN_COUNT + 1] = {
     "-", "1", "2", "3", "4", "5", "6", "7", "8",
@@ -128,6 +132,44 @@ uint16_t vtx1G3_Bandchan2Freq(uint8_t band, uint8_t channel)
     if (band > 0 && band <= VTX_STRING_1G3_BAND_COUNT &&
                           channel > 0 && channel <= VTX_STRING_1G3_CHAN_COUNT) {
         return vtx1G3frequencyTable[band - 1][channel - 1];
+    }
+    return 0;
+}
+
+// 3.3 GHz SX33 IRC Tramp frequency table
+const uint16_t vtx3G3frequencyTable[VTX_STRING_3G3_BAND_COUNT][VTX_STRING_3G3_CHAN_COUNT] =
+{
+    { 3200, 3220, 3240, 3260, 3280, 3300, 3320, 3340 }, // A
+    { 3360, 3380, 3400, 3420, 3440, 3460, 3480, 3500 }, // B
+    { 3520, 3540, 3560, 3580, 3600, 3620, 3640, 3680 }, // C
+    { 3210, 3250, 3290, 3330, 3370, 3410, 3450, 3490 }, // D
+    { 3230, 3290, 3350, 3410, 3470, 3530, 3590, 3700 }, // E
+};
+
+const char * const vtx3G3BandNames[VTX_STRING_3G3_BAND_COUNT + 1] = {
+    "-",
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+};
+
+const char vtx3G3BandLetter[VTX_STRING_3G3_BAND_COUNT + 1] = {'-', 'A', 'B', 'C', 'D', 'E'};
+
+const char * const vtx3G3ChannelNames[VTX_STRING_3G3_CHAN_COUNT + 1] = {
+    "-", "1", "2", "3", "4", "5", "6", "7", "8",
+};
+
+const char * const vtx3G3DefaultPowerNames[VTX_STRING_3G3_POWER_COUNT + 1] = {
+    "---", "25 ", "2W ", "5W "
+};
+
+uint16_t vtx3G3_Bandchan2Freq(uint8_t band, uint8_t channel)
+{
+    if (band > 0 && band <= VTX_STRING_3G3_BAND_COUNT &&
+                          channel > 0 && channel <= VTX_STRING_3G3_CHAN_COUNT) {
+        return vtx3G3frequencyTable[band - 1][channel - 1];
     }
     return 0;
 }

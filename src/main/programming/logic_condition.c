@@ -487,6 +487,39 @@ static int logicConditionCompute(
             return operandA;
             break;
 #endif
+
+#if defined(USE_VTX_CONTROL)
+        case LOGIC_CONDITION_SET_VTX_CUSTOM_SLOT:
+            {
+                uint8_t newBand = (operandA >> 8) & 0xFF;
+                uint8_t newChannel = operandA & 0xFF;
+                uint8_t newPower = operandB & 0xFF;
+
+                if (newBand >= VTX_SETTINGS_MIN_BAND && newBand <= VTX_SETTINGS_MAX_BAND &&
+                    newChannel >= VTX_SETTINGS_MIN_CHANNEL && newChannel <= VTX_SETTINGS_MAX_CHANNEL) {
+
+                    vtxSettingsConfigMutable()->band = newBand;
+                    vtxSettingsConfigMutable()->channel = newChannel;
+                    vtxSettingsConfigMutable()->frequencyGroup = FREQUENCYGROUP_3G3;
+
+                    if (newPower > 0) {
+                        vtxSettingsConfigMutable()->power = newPower;
+                    }
+
+                    vtxDevice_t *vtxDevice = vtxCommonDevice();
+                    if (vtxDevice) {
+                        vtxCommonSetBandAndChannel(vtxDevice, newBand, newChannel);
+                        if (newPower > 0) {
+                            vtxCommonSetPowerByIndex(vtxDevice, newPower);
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
+            break;
+#endif
+
         default:
             return false;
             break;
