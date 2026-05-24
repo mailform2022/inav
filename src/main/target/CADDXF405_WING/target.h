@@ -96,7 +96,7 @@
 #define I2C1_SDA                PB9
 
 /*
- * Sensor drivers - multiple IMUs for hardware auto-detection
+ * Sensor drivers
  */
 
 // ICM42605/ICM42688P
@@ -110,24 +110,6 @@
 #define IMU_LSM6DXX_ALIGN       CW270_DEG
 #define LSM6DXX_CS_PIN          PA4
 #define LSM6DXX_SPI_BUS         BUS_SPI1
-
-// BMI270
-#define USE_IMU_BMI270
-#define IMU_BMI270_ALIGN        CW270_DEG
-#define BMI270_CS_PIN           PA4
-#define BMI270_SPI_BUS          BUS_SPI1
-
-// MPU6000
-#define USE_IMU_MPU6000
-#define IMU_MPU6000_ALIGN       CW270_DEG
-#define MPU6000_CS_PIN          PA4
-#define MPU6000_SPI_BUS         BUS_SPI1
-
-// MPU6500
-#define USE_IMU_MPU6500
-#define IMU_MPU6500_ALIGN       CW270_DEG
-#define MPU6500_CS_PIN          PA4
-#define MPU6500_SPI_BUS         BUS_SPI1
 
 // Baro
 #define USE_BARO
