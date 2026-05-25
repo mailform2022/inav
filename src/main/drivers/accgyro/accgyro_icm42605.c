@@ -303,11 +303,12 @@ static bool icm42605DeviceDetect(busDevice_t * dev)
         busRead(dev, MPU_RA_WHO_AM_I, &tmp);
 
         switch (tmp) {
-            /* ICM42605 and ICM42688P share the register structure*/
+            /* ICM42605, ICM42688P and ICM40609D share the register structure */
             case ICM42605_WHO_AM_I_CONST:
                 is42688P = false;
                 return true;
             case ICM42688P_WHO_AM_I_CONST:
+            case ICM40609D_WHO_AM_I_CONST:
                 is42688P = true;
                 return true;
 
