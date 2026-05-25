@@ -103,12 +103,6 @@
 #define ICM42605_CS_PIN         PA4
 #define ICM42605_SPI_BUS        BUS_SPI1
 
-// LSM6DXX
-#define USE_IMU_LSM6DXX
-#define IMU_LSM6DXX_ALIGN       CW270_DEG
-#define LSM6DXX_CS_PIN          PA4
-#define LSM6DXX_SPI_BUS         BUS_SPI1
-
 // Baro
 #define USE_BARO
 #define BARO_I2C_BUS            BUS_I2C1
