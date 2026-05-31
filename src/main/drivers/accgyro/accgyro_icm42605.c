@@ -94,6 +94,17 @@
 #define ICM42605_INTF_CONFIG1_AFSR_MASK             0xC0
 #define ICM42605_INTF_CONFIG1_AFSR_DISABLE          0x40
 
+// Soft reset (DEVICE_CONFIG register), shared by the whole ICM-426xx family
+#define ICM426XX_RA_DEVICE_CONFIG                   0x11
+#define ICM426XX_DEVICE_CONFIG_SOFT_RESET           0x01
+
+// Accelerometer full-scale select (ACCEL_CONFIG0 bits [7:5]).
+// NOTE: the ICM-40609-D inverts the FSR encoding relative to the ICM-42605/42688P:
+// on the 40609, FS_SEL=0 is +/-32g and FS_SEL=1 is +/-16g, whereas on the
+// 42605/42688P FS_SEL=0 is already +/-16g. We always target +/-16g (acc_1G=2048).
+#define ICM42605_ACCEL_FS_SEL_16G                   (0x00 << 5)
+#define ICM40609_ACCEL_FS_SEL_16G                   (0x01 << 5)
+
 // --- Registers for gyro and acc Anti-Alias Filter ---------
 #define ICM426XX_RA_GYRO_CONFIG_STATIC3             0x0C  // User Bank 1
 #define ICM426XX_RA_GYRO_CONFIG_STATIC4             0x0D  // User Bank 1
@@ -103,6 +114,7 @@
 #define ICM426XX_RA_ACCEL_CONFIG_STATIC4            0x05  // User Bank 2
 
 static bool is42688P = false;
+static bool is40609 = false;
 
 typedef struct aafConfig_s {
     uint16_t freq;
@@ -232,7 +244,10 @@ static void icm42605AccAndGyroInit(gyroDev_t *gyro)
     busWrite(dev, ICM42605_RA_GYRO_CONFIG0, (0x00) << 5 | (config->gyroConfigValues[1] & 0x0F));    /* 2000 deg/s */
     delay(15);
 
-    busWrite(dev, ICM42605_RA_ACCEL_CONFIG0, (0x00) << 5 | (config->gyroConfigValues[1] & 0x0F));    /* 16 G deg/s */
+    /* Always configure the accelerometer for a +/-16g full scale (acc_1G = 2048).
+     * The 40609 needs FS_SEL=1 to get 16g; the 42605/42688P need FS_SEL=0. */
+    const uint8_t accelFsSel = is40609 ? ICM40609_ACCEL_FS_SEL_16G : ICM42605_ACCEL_FS_SEL_16G;
+    busWrite(dev, ICM42605_RA_ACCEL_CONFIG0, accelFsSel | (config->gyroConfigValues[1] & 0x0F));    /* 16 G */
     delay(15);
 
     /* LPF bandwidth */
@@ -306,10 +321,24 @@ static bool icm42605DeviceDetect(busDevice_t * dev)
             /* ICM42605, ICM42688P and ICM40609D share the register structure */
             case ICM42605_WHO_AM_I_CONST:
                 is42688P = false;
+                is40609 = false;
                 return true;
             case ICM42688P_WHO_AM_I_CONST:
-            case ICM40609D_WHO_AM_I_CONST:
                 is42688P = true;
+                is40609 = false;
+                return true;
+            case ICM40609D_WHO_AM_I_CONST:
+                /* The ICM-40609-D can be left in an inconsistent state by the
+                 * preceding MPU60x0/other probes that share this SPI CS. Issue a
+                 * soft reset so the subsequent init sequence starts from a known
+                 * state (matches the stock SPEEDYBEEF405WING/CADDX firmware and
+                 * Betaflight's dedicated 40609 driver). */
+                is42688P = true;   // 40609 uses the same AAF table layout as 42688P
+                is40609 = true;
+                busWrite(dev, ICM426XX_RA_DEVICE_CONFIG, ICM426XX_DEVICE_CONFIG_SOFT_RESET);
+                delay(10);
+                busWrite(dev, ICM42605_RA_PWR_MGMT0, 0x00);
+                delay(10);
                 return true;
 
             default:
