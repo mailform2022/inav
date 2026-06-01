@@ -369,12 +369,18 @@ static void impl_Process(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
                 vtxState.protoTimeoutCount = 0;
 
                 if (vtxProtoProcessResponse() == VTX_RESPONSE_TYPE_STATUS) {
-                    // Check if VTX state matches VTX request
-                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_FREQUENCY) && (vtxState.state.freq != vtxState.request.freq)) {
+                    // Re-assert a setting only if the VTX reports a plausible
+                    // (non-zero) read-back that differs from the request. The SX33
+                    // (and some other Tramp clones) do not report their current
+                    // frequency/power and return 0; without the non-zero guard the
+                    // frequency request would be re-queued on every status cycle and
+                    // permanently starve the power command (channel switches, power
+                    // never does).
+                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_FREQUENCY) && (vtxState.state.freq != 0) && (vtxState.state.freq != vtxState.request.freq)) {
                         vtxState.updateReqMask |= VTX_UPDATE_REQ_FREQUENCY;
                     }
 
-                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_POWER) && (vtxState.state.power != vtxState.request.power)) {
+                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_POWER) && (vtxState.state.power != 0) && (vtxState.state.power != vtxState.request.power)) {
                         vtxState.updateReqMask |= VTX_UPDATE_REQ_POWER;
                     }
 
