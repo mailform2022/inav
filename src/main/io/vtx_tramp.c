@@ -230,6 +230,17 @@ static vtxProtoResponseType_e vtxProtoProcessResponse(void)
             vtxState.capabilities.powerMax = vtxState.recvPkt[6] | (vtxState.recvPkt[7] << 8);
 
             if (vtxState.capabilities.freqMin != 0 && vtxState.capabilities.freqMin < vtxState.capabilities.freqMax) {
+                // The SX33 (3.3 GHz IRC Tramp) reports generic 5.8 GHz capabilities
+                // (a 5.8 GHz frequency range and ~600 mW max) regardless of its real
+                // band. When the 3.3 GHz frequency group is selected, trust the group's
+                // known limits so the computed 3.3 GHz frequency is accepted and sent,
+                // and so the power is not capped to the misreported value.
+                if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+                    vtxState.capabilities.freqMin = VTX_TRAMP_3G3_MIN_FREQUENCY_MHZ;
+                    vtxState.capabilities.freqMax = VTX_TRAMP_3G3_MAX_FREQUENCY_MHZ;
+                    vtxState.capabilities.powerMax = VTX_TRAMP_3G3_MAX_POWER_MW;
+                }
+
                 // Some TRAMP VTXes may report max power incorrectly (i.e. 200mW for a 600mW VTX)
                 // Make use of vtxSettingsConfig()->maxPowerOverride to override
                 if (vtxSettingsConfig()->maxPowerOverride != 0) {
@@ -585,8 +596,8 @@ const char * const trampPowerNames_1G3_800[VTX_TRAMP_1G3_MAX_POWER_COUNT + 1] = 
 const uint16_t trampPowerTable_1G3_2000[VTX_TRAMP_1G3_MAX_POWER_COUNT]         = { 25, 200, 2000 };
 const char * const trampPowerNames_1G3_2000[VTX_TRAMP_1G3_MAX_POWER_COUNT + 1] = { "---", "25 ", "200", "2000" };
 
-const uint16_t trampPowerTable_3G3[VTX_TRAMP_3G3_MAX_POWER_COUNT]              = { 25, 2000, 5000 };
-const char * const trampPowerNames_3G3[VTX_TRAMP_3G3_MAX_POWER_COUNT + 1]      = { "---", "25 ", "2W ", "5W " };
+const uint16_t trampPowerTable_3G3[VTX_TRAMP_3G3_MAX_POWER_COUNT]              = { 25, 200, 5000 };
+const char * const trampPowerNames_3G3[VTX_TRAMP_3G3_MAX_POWER_COUNT + 1]      = { "---", "25 ", "200", "5W " };
 
 static void vtxProtoUpdatePowerMetadata(uint16_t maxPower)
 {

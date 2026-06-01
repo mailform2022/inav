@@ -48,5 +48,6 @@
 
 #define VTX_TRAMP_3G3_MIN_FREQUENCY_MHZ 3200
 #define VTX_TRAMP_3G3_MAX_FREQUENCY_MHZ 3700
+#define VTX_TRAMP_3G3_MAX_POWER_MW      5000
 
 bool vtxTrampInit(void);
