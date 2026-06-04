@@ -473,11 +473,12 @@ static void impl_SetPowerByIndex(vtxDevice_t * vtxDevice, uint8_t index)
     vtxState.request.powerIndex = index;
 
     // Value actually transmitted to the VTX. Standard Tramp expects mW, but the
-    // SX33 (3.3 GHz) uses its own device-scale values (0/100/600 for its
-    // 25/200/5000 mW levels) and ignores real mW or an index. Map 3G3 power to
-    // those device values; all other groups send mW unchanged.
+    // SX33 (3.3 GHz) uses its own device-scale codes and ignores real mW or an
+    // index. Its three levels (25/200/5000 mW) map to codes 25/100/600 (it
+    // reports 0 for the lowest, but a 0 set-command means pit/off). Map 3G3
+    // power to those device codes; all other groups send mW unchanged.
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        static const uint16_t tramp3G3DevicePower[VTX_TRAMP_3G3_MAX_POWER_COUNT] = { 0, 100, 600 };
+        static const uint16_t tramp3G3DevicePower[VTX_TRAMP_3G3_MAX_POWER_COUNT] = { 25, 100, 600 };
         vtxState.request.devicePower = tramp3G3DevicePower[index - 1];
     } else {
         vtxState.request.devicePower = vtxState.request.power;
