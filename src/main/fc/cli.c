@@ -68,9 +68,6 @@ bool cliMode = false;
 #include "drivers/time.h"
 #include "drivers/usb_msc.h"
 #include "drivers/vtx_common.h"
-#if defined(USE_VTX_TRAMP) && defined(USE_VTX_CONTROL)
-#include "io/vtx_tramp.h"
-#endif
 #include "drivers/light_ws2811strip.h"
 
 #include "fc/fc_core.h"
@@ -3833,35 +3830,6 @@ static void cliStatus(char *cmdline)
     else {
         cliPrint("not detected");
     }
-
-#if defined(USE_VTX_TRAMP)
-    // Dump the raw Tramp capabilities/status frames reported by the VTX. This is
-    // a diagnostic aid for clones (e.g. SX33) that report generic data and/or
-    // ignore commands - it shows exactly what the device sends back.
-    {
-        const uint8_t *caps = NULL, *st = NULL;
-        bool capsValid = false, stValid = false;
-        vtxTrampGetDebugFrames(&caps, &capsValid, &st, &stValid);
-        cliPrintLinefeed();
-        cliPrint("VTX TRAMP caps:");
-        if (capsValid) {
-            for (int i = 0; i < VTX_TRAMP_DEBUG_FRAME_SIZE; i++) {
-                cliPrintf(" %02X", caps[i]);
-            }
-        } else {
-            cliPrint(" (none)");
-        }
-        cliPrintLinefeed();
-        cliPrint("VTX TRAMP status:");
-        if (stValid) {
-            for (int i = 0; i < VTX_TRAMP_DEBUG_FRAME_SIZE; i++) {
-                cliPrintf(" %02X", st[i]);
-            }
-        } else {
-            cliPrint(" (none)");
-        }
-    }
-#endif
 #else
     cliPrint("no VTX control");
 #endif

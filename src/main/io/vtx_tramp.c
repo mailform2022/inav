@@ -98,19 +98,10 @@ typedef struct {
     // Actual VTX state: updated from actual VTX
     struct {
         unsigned freq;      // Frequency in MHz
-        unsigned power;       // Configured power, frame bytes 4-5
-        unsigned actualPower; // Running/actual power, frame bytes 8-9
+        unsigned power;     // Configured power, frame bytes 4-5
         unsigned temp;
         bool     pitMode;
     } state;
-
-    // Diagnostics: raw copies of the last capabilities/status frames received
-    // from the VTX. Used to reverse-engineer the SX33 protocol (it reports
-    // generic data and ignores some commands), surfaced via CLI `status`.
-    uint8_t  dbgCapsRaw[VTX_PKT_SIZE];
-    uint8_t  dbgStatusRaw[VTX_PKT_SIZE];
-    bool     dbgHaveCaps;
-    bool     dbgHaveStatus;
 
     struct {
         int              powerTableCount;
@@ -235,8 +226,6 @@ static vtxProtoResponseType_e vtxProtoProcessResponse(void)
 
     switch (respCode) {
         case 0x72:
-            memcpy(vtxState.dbgCapsRaw, vtxState.recvPkt, VTX_PKT_SIZE);
-            vtxState.dbgHaveCaps = true;
             vtxState.capabilities.freqMin = vtxState.recvPkt[2] | (vtxState.recvPkt[3] << 8);
             vtxState.capabilities.freqMax = vtxState.recvPkt[4] | (vtxState.recvPkt[5] << 8);
             vtxState.capabilities.powerMax = vtxState.recvPkt[6] | (vtxState.recvPkt[7] << 8);
@@ -267,12 +256,9 @@ static vtxProtoResponseType_e vtxProtoProcessResponse(void)
             break;
 
         case 0x76:
-            memcpy(vtxState.dbgStatusRaw, vtxState.recvPkt, VTX_PKT_SIZE);
-            vtxState.dbgHaveStatus = true;
             vtxState.state.freq = vtxState.recvPkt[2] | (vtxState.recvPkt[3] << 8);
             vtxState.state.power = vtxState.recvPkt[4]|(vtxState.recvPkt[5] << 8);
             vtxState.state.pitMode = vtxState.recvPkt[7];
-            vtxState.state.actualPower = vtxState.recvPkt[8]|(vtxState.recvPkt[9] << 8);
             return VTX_RESPONSE_TYPE_STATUS;
     }
 
@@ -730,17 +716,6 @@ bool vtxTrampInit(void)
 
     vtxState.protoState = VTX_STATE_RESET;
 
-    return true;
-}
-
-// Diagnostics: expose the raw last capabilities/status frames received from the
-// VTX so the SX33's native frequency/power reporting can be inspected via CLI.
-bool vtxTrampGetDebugFrames(const uint8_t **caps, bool *capsValid, const uint8_t **status, bool *statusValid)
-{
-    *caps = vtxState.dbgCapsRaw;
-    *capsValid = vtxState.dbgHaveCaps;
-    *status = vtxState.dbgStatusRaw;
-    *statusValid = vtxState.dbgHaveStatus;
     return true;
 }
 
