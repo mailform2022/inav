@@ -339,7 +339,15 @@ static void impl_Process(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
                 }
                 else if (vtxState.updateReqMask & VTX_UPDATE_REQ_POWER) {
                     vtxState.updateReqMask &= ~VTX_UPDATE_REQ_POWER;
-                    vtxProtoSetPower(vtxState.request.power);
+                    // Standard Tramp expects the power command parameter in mW.
+                    // The SX33 (3.3 GHz) instead expects a 0-based power level index
+                    // (0,1,2); sending mW values (25/200/5000) is treated as an
+                    // out-of-range index and silently ignored. Send the index for 3G3.
+                    uint16_t powerParam = vtxState.request.power;
+                    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+                        powerParam = (vtxState.request.powerIndex > 0) ? (vtxState.request.powerIndex - 1) : 0;
+                    }
+                    vtxProtoSetPower(powerParam);
                     vtxProtoSetState(VTX_STATE_QUERY_DELAY);
                 }
             }
