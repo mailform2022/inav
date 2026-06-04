@@ -50,4 +50,10 @@
 #define VTX_TRAMP_3G3_MAX_FREQUENCY_MHZ 3700
 #define VTX_TRAMP_3G3_MAX_POWER_MW      5000
 
+#define VTX_TRAMP_DEBUG_FRAME_SIZE 16
+
 bool vtxTrampInit(void);
+
+// Diagnostics: fetch the raw last capabilities (0x72) and status (0x76) frames
+// received from the VTX (each VTX_TRAMP_DEBUG_FRAME_SIZE bytes).
+bool vtxTrampGetDebugFrames(const uint8_t **caps, bool *capsValid, const uint8_t **status, bool *statusValid);
