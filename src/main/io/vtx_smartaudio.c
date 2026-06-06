@@ -61,8 +61,8 @@
 static serialPort_t *smartAudioSerialPort = NULL;
 
 uint8_t saPowerCount = VTX_SMARTAUDIO_DEFAULT_POWER_COUNT;
-const char * saPowerNames[VTX_SMARTAUDIO_MAX_POWER_COUNT + 1] = {
-    "----", "25  ", "200 ", "500 ", "800 ", "    "
+const char *saPowerNames[VTX_SMARTAUDIO_MAX_POWER_COUNT + 1] = {
+    "----", "25  ", "200 ", "500 ", "800 ", "    ", "    ", "    ", "    "
 };
 
 // Save powerlevels reported from SA 2.1 devices here
@@ -73,7 +73,7 @@ static vtxDevice_t vtxSmartAudio = {
     .vTable = &saVTable,
     .capability.bandCount = VTX_SMARTAUDIO_BAND_COUNT,
     .capability.channelCount = VTX_SMARTAUDIO_CHANNEL_COUNT,
-    .capability.powerCount = VTX_SMARTAUDIO_MAX_POWER_COUNT,
+    .capability.powerCount = VTX_SMARTAUDIO_MAX_POWER_COUNT, // Should this be VTX_SMARTAUDIO_DEFAULT_POWER_COUNT?
     .capability.bandNames = (char **)vtx58BandNames,
     .capability.channelNames = (char **)vtx58ChannelNames,
     .capability.powerNames = (char**)saPowerNames
@@ -124,7 +124,10 @@ saPowerTable_t saPowerTable[VTX_SMARTAUDIO_MAX_POWER_COUNT] = {
     { 200,  16 },
     { 500,  25 },
     { 800,  40 },
-    {   0,   0 } // Placeholder
+    {   0,   0 }, // Placeholders
+    {   0,   0 },
+    {   0,   0 },
+    {   0,   0 }
 };
 
 // Last received device ('hard') states
@@ -142,6 +145,13 @@ smartAudioDevice_t saDevice = {
 static smartAudioDevice_t saDevicePrev = {
     .version = 0,
 };
+
+// 3.3 GHz (FF3741 and similar SmartAudio clones) share the SX33 3G3 grid. The
+// device tunes by direct user-frequency (its own band/channel table is 5.8 GHz
+// and can't reach 3G3), so remember the requested band/channel to report them
+// back and to avoid re-sending the set command every cycle.
+static uint8_t sa3G3Band = 0;
+static uint8_t sa3G3Channel = 0;
 
 // XXX Possible compliance problem here. Need LOCK/UNLOCK menu?
 static uint8_t saLockMode = SA_MODE_SET_UNLOCK; // saCms variable?
@@ -209,7 +219,7 @@ int saDacToPowerIndex(int dac)
 
 int saDbiToMw(uint16_t dbi) {
 
-    uint16_t mw = (uint16_t)pow(10.0, dbi / 10.0);
+    uint16_t mw = (uint16_t)roundf(powf(10.0f, (float)dbi / 10.0f));
 
     if (dbi > 14) {
         // For powers greater than 25mW round up to a multiple of 50 to match expectations
@@ -790,9 +800,22 @@ static bool vtxSAIsReady(const vtxDevice_t *vtxDevice)
 void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channel)
 {
     UNUSED(vtxDevice);
-    if (saValidateBandAndChannel(band, channel)) {
-        saSetBandAndChannel(band - 1, channel - 1);
+    if (!saValidateBandAndChannel(band, channel)) {
+        return;
     }
+
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // FF3741: tune by direct user frequency from the 3.3 GHz grid.
+        const uint16_t freq = vtx3G3_Bandchan2Freq(band, channel);
+        if (freq) {
+            sa3G3Band = band;
+            sa3G3Channel = channel;
+            saSetFreq(freq);
+        }
+        return;
+    }
+
+    saSetBandAndChannel(band - 1, channel - 1);
 }
  static void vtxSASetPowerByIndex(vtxDevice_t *vtxDevice, uint8_t index)
 {
@@ -887,6 +910,21 @@ static bool vtxSAGetBandAndChannel(const vtxDevice_t *vtxDevice, uint8_t *pBand,
         return false;
     }
 
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // Report the requested 3.3 GHz band/channel once the device confirms it
+        // is running at that user frequency, so the control loop stops
+        // re-sending the set command.
+        if ((saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) && sa3G3Band &&
+            saDevice.freq == vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel)) {
+            *pBand = sa3G3Band;
+            *pChannel = sa3G3Channel;
+        } else {
+            *pBand = 0;
+            *pChannel = 0;
+        }
+        return true;
+    }
+
     // if in user-freq mode then report band as zero
     *pBand = (saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) ? 0 :
         (SA_DEVICE_CHVAL_TO_BAND(saDevice.channel) + 1);
@@ -919,6 +957,12 @@ static bool vtxSAGetFreq(const vtxDevice_t *vtxDevice, uint16_t *pFreq)
 {
     if (!vtxSAIsReady(vtxDevice)) {
         return false;
+    }
+
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        *pFreq = (saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) ? saDevice.freq :
+            vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel);
+        return true;
     }
 
     // if not in user-freq mode then convert band/chan to frequency
@@ -960,14 +1004,16 @@ static bool vtxSAGetOsdInfo(const  vtxDevice_t *vtxDevice, vtxDeviceOsdInfo_t * 
         return false;
     }
 
+    const bool is3G3 = (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3);
+
     pOsdInfo->band = band;
     pOsdInfo->channel = channel;
     pOsdInfo->frequency = freq;
     pOsdInfo->powerIndex = powerIndex;
     pOsdInfo->powerMilliwatt = powerMw;
-    pOsdInfo->bandLetter = vtx58BandNames[band][0];
-    pOsdInfo->bandName = vtx58BandNames[band];
-    pOsdInfo->channelName = vtx58ChannelNames[channel];
+    pOsdInfo->bandLetter = is3G3 ? vtx3G3BandNames[band][0] : vtx58BandNames[band][0];
+    pOsdInfo->bandName = is3G3 ? vtx3G3BandNames[band] : vtx58BandNames[band];
+    pOsdInfo->channelName = is3G3 ? vtx3G3ChannelNames[channel] : vtx58ChannelNames[channel];
     pOsdInfo->powerIndexLetter = '0' + powerIndex;
     return true;
 }
