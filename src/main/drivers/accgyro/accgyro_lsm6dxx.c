@@ -49,6 +49,20 @@ typedef struct __attribute__ ((__packed__)) lsm6DContextData_s {
 #define LSM6DSO_CHIP_ID 0x6C
 #define LSM6DSL_CHIP_ID 0x6A
 #define LSM6DS3_CHIP_ID 0x69
+#define LSM6DSV16X_CHIP_ID 0x70
+
+// LSM6DSV register addresses (differ from classic LSM6DSL/DSO layout)
+#define LSM6DSV_IF_CFG       0x03
+#define LSM6DSV_INT1_CTRL    0x0D
+#define LSM6DSV_INT2_CTRL    0x0E
+#define LSM6DSV_CTRL1        0x10
+#define LSM6DSV_CTRL2        0x11
+#define LSM6DSV_CTRL3        0x12
+#define LSM6DSV_CTRL4        0x13
+#define LSM6DSV_CTRL6        0x15
+#define LSM6DSV_CTRL7        0x16
+#define LSM6DSV_CTRL8        0x17
+#define LSM6DSV_CTRL9        0x18
 
 static uint8_t lsm6dID = 0x6C;
 
@@ -85,8 +99,63 @@ static uint8_t getLsmDlpfBandwidth(gyroDev_t *gyro)
     return 0;
 }
 
+static void lsm6dsvConfig(gyroDev_t *gyro)
+{
+    busDevice_t *dev = gyro->busDev;
+    gyro->sampleRateIntervalUs = gyro->requestedSampleIntervalUs;
+
+    busSetSpeed(dev, BUS_SPEED_INITIALIZATION);
+
+    // Software reset
+    busWrite(dev, LSM6DSV_CTRL3, 0x01);   // SW_RESET
+    delay(20);
+
+    // BDU + auto-increment
+    busWrite(dev, LSM6DSV_CTRL3, 0x44);   // BDU(0x40) | IF_INC(0x04)
+
+    // Disable I2C/I3C
+    busWrite(dev, LSM6DSV_IF_CFG, 0x01);  // I2C_I3C_DISABLE
+
+    // Gyro data ready on INT1, disable INT2
+    busWrite(dev, LSM6DSV_INT1_CTRL, 0x02);
+    busWrite(dev, LSM6DSV_INT2_CTRL, 0x00);
+
+    // DRDY pulsed mode
+    busWrite(dev, LSM6DSV_CTRL4, 0x02);   // DRDY_PULSED
+
+    // Accel: high-performance mode, 960 Hz ODR
+    // CTRL1 [6:4]=OP_MODE 0=high-perf, [3:0]=ODR 9=960Hz
+    busWrite(dev, LSM6DSV_CTRL1, 0x09);
+
+    // Gyro: high-performance mode, 7680 Hz ODR
+    // CTRL2 [6:4]=OP_MODE 0=high-perf, [3:0]=ODR 12=7680Hz
+    busWrite(dev, LSM6DSV_CTRL2, 0x0C);
+
+    // Accel full scale 16G
+    // CTRL8 [1:0]=FS_XL 3=16G
+    busWrite(dev, LSM6DSV_CTRL8, 0x03);
+
+    // Gyro full scale 2000 dps, LPF1 BW ~288 Hz
+    // CTRL6 [6:4]=LPF1_G_BW 0=288Hz, [3:0]=FS_G 4=2000dps
+    busWrite(dev, LSM6DSV_CTRL6, 0x04);
+
+    // Enable gyro LPF1
+    busWrite(dev, LSM6DSV_CTRL7, 0x01);   // LPF1_G_EN
+
+    // Enable accel LPF2
+    busWrite(dev, LSM6DSV_CTRL9, 0x08);   // LPF2_XL_EN
+
+    delay(1);
+    busSetSpeed(dev, BUS_SPEED_FAST);
+}
+
 static void lsm6dxxConfig(gyroDev_t *gyro)
 { 
+    if (lsm6dID == LSM6DSV16X_CHIP_ID) {
+        lsm6dsvConfig(gyro);
+        return;
+    }
+
     busDevice_t * dev = gyro->busDev;
     const gyroFilterAndRateConfig_t * config = mpuChooseGyroConfig(gyro->lpf, 1000000 / gyro->requestedSampleIntervalUs);
     gyro->sampleRateIntervalUs = 1000000 / config->gyroRateHz;
@@ -153,7 +222,8 @@ static bool lsm6dxxDetect(busDevice_t * dev)
 
         switch (tmp) {
             case LSM6DSO_CHIP_ID:
-            case LSM6DSL_CHIP_ID: 
+            case LSM6DSL_CHIP_ID:
+            case LSM6DSV16X_CHIP_ID:
                  lsm6dID = tmp;
                 // Compatible chip detected
                 return true;
@@ -222,7 +292,7 @@ bool lsm6dGyroDetect(gyroDev_t *gyro)
     gyro->initFn = lsm6dxxSpiGyroInit;
     gyro->readFn = lsm6dxxGyroRead;
     gyro->intStatusFn = gyroCheckDataReady;
-    gyro->scale = 1.0f / 16.4f; // 2000 dps
+    gyro->scale = (lsm6dID == LSM6DSV16X_CHIP_ID) ? 0.070f : (1.0f / 16.4f);
     return true;
 
 }
