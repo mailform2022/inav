@@ -808,8 +808,12 @@ vtxDevType_e vtxSAGetDeviceType(const vtxDevice_t *vtxDevice)
 
 static bool vtxSAIsReady(const vtxDevice_t *vtxDevice)
 {
-    return vtxDevice != NULL && !(saDevice.power == 0);
-    //wait until power reading exists
+    // Device is ready once it has answered a GET_SETTINGS request (version set).
+    // Do NOT gate on power: some 3.3 GHz clones (e.g. FF3741) report a bogus
+    // power table so the reported current power never maps to a known index and
+    // saDevice.power stays 0, which would otherwise make the whole VTX look
+    // "not detected" and stop band/channel switching.
+    return vtxDevice != NULL && saDevice.version != SA_UNKNOWN;
 }
 
 void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channel)
@@ -840,6 +844,18 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         return;
     }
 
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // FF3741 on the 3.3 GHz grid manages its own power (button / auto-ramp
+        // to maximum) and reports a bogus SmartAudio power table, so sending
+        // SET_POWER would only drive it to a wrong (low) level. Just remember
+        // the requested index so vtxSAGetPowerIndex() reports it back and the
+        // control loop converges instead of continuously re-sending SET_POWER
+        // (which would block band/channel changes). Leave the device's power
+        // alone so it stays at its own maximum.
+        sa3G3Power = index;
+        return;
+    }
+
     if (index == 0) {
         LOG_DEBUG(VTX, "SmartAudio doesn't support power off");
         return;
@@ -848,18 +864,6 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
     if (index > saPowerCount) {
         LOG_DEBUG(VTX, "Invalid power level");
         return;
-    }
-
-    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 on the 3.3 GHz grid: power is governed by the VTX itself
-        // (button / auto-ramp), so always command the device's maximum power.
-        // Remember the requested index so vtxSAGetPowerIndex() reports it back
-        // and the control loop converges instead of continuously re-sending
-        // SET_POWER (which would block band/channel changes).
-        sa3G3Power = index;
-        if (saPowerCount > 0) {
-            index = saPowerCount;
-        }
     }
 
     LOG_DEBUG(VTX, "saSetPowerByIndex: index %d, value %d\r\n", index, buf[4]);
