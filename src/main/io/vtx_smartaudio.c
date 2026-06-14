@@ -830,13 +830,14 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 is a 3.3 GHz VTX whose native SmartAudio band/channel grid IS
-        // the 3.3 GHz grid (same layout as the SX33). It acknowledges, but does
-        // not physically retune from, user-frequency commands, so tune it with
-        // the native SET_CHANNEL command using the same band/channel index.
-        sa3G3Band = band;
-        sa3G3Channel = channel;
-        saSetBandAndChannel(band - 1, channel - 1);
+        // FF3741 stays locked in SmartAudio user-frequency mode and ignores
+        // SET_CHANNEL, so tune it by direct user frequency from the 3.3 GHz grid.
+        const uint16_t freq = vtx3G3_Bandchan2Freq(band, channel);
+        if (freq) {
+            sa3G3Band = band;
+            sa3G3Channel = channel;
+            saSetFreq(freq);
+        }
         return;
     }
 
@@ -954,11 +955,17 @@ static bool vtxSAGetBandAndChannel(const vtxDevice_t *vtxDevice, uint8_t *pBand,
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 is driven by its native channel index on the 3.3 GHz grid, so
-        // decode the device's confirmed channel directly. The control loop then
-        // sees the applied band/channel and stops re-sending SET_CHANNEL.
-        *pBand = SA_DEVICE_CHVAL_TO_BAND(saDevice.channel) + 1;
-        *pChannel = SA_DEVICE_CHVAL_TO_CHANNEL(saDevice.channel) + 1;
+        // FF3741 runs in user-frequency mode; report the requested band/channel
+        // once the device confirms it is running at that user frequency, so the
+        // control loop stops re-sending the set command.
+        if ((saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) && sa3G3Band &&
+            saDevice.freq == vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel)) {
+            *pBand = sa3G3Band;
+            *pChannel = sa3G3Channel;
+        } else {
+            *pBand = 0;
+            *pChannel = 0;
+        }
         return true;
     }
 
@@ -1004,10 +1011,10 @@ static bool vtxSAGetFreq(const vtxDevice_t *vtxDevice, uint16_t *pFreq)
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 runs on its native channel; map the confirmed channel to the
-        // 3.3 GHz grid frequency for display.
-        *pFreq = vtx3G3_Bandchan2Freq(SA_DEVICE_CHVAL_TO_BAND(saDevice.channel) + 1,
-            SA_DEVICE_CHVAL_TO_CHANNEL(saDevice.channel) + 1);
+        // FF3741 runs in user-frequency mode; report the device's actual user
+        // frequency, falling back to the requested grid frequency.
+        *pFreq = (saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) ? saDevice.freq :
+            vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel);
         return true;
     }
 
