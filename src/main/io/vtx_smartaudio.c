@@ -150,13 +150,13 @@ static smartAudioDevice_t saDevicePrev = {
 // device tunes by direct user-frequency (its own band/channel table is 5.8 GHz
 // and can't reach 3G3), so remember the requested band/channel to report them
 // back and to avoid re-sending the set command every cycle.
-static uint8_t sa3G3Band = 0;
-static uint8_t sa3G3Channel = 0;
+uint8_t sa3G3Band = 0;
+uint8_t sa3G3Channel = 0;
 // Power index requested while on the 3G3 grid. The FF3741 controls power on its
 // own (button/auto-ramp), so we always command the device's maximum power, but
 // report back the requested index so the control loop converges and does not
 // keep re-sending SET_POWER (which would starve the band/channel commands).
-static uint8_t sa3G3Power = 0;
+uint8_t sa3G3Power = 0;
 
 // DIAG: remember the last GET_SETTINGS response so `status` can dump the raw
 // frame for analyzing how an unknown SmartAudio VTX (e.g. FF3741) reports its

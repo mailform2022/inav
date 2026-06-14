@@ -68,6 +68,8 @@ bool cliMode = false;
 #include "drivers/time.h"
 #include "drivers/usb_msc.h"
 #include "drivers/vtx_common.h"
+#include "io/vtx.h"
+#include "io/vtx_string.h"
 #include "io/vtx_smartaudio.h"
 #include "drivers/light_ws2811strip.h"
 
@@ -3851,6 +3853,16 @@ static void cliStatus(char *cmdline)
     for (int i = 0; i < saLastSettingsLen; i++) {
         cliPrintf(" %02X", saLastSettings[i]);
     }
+    cliPrintLinefeed();
+    // DIAG: config vs 3G3 request vs device freq, to trace where a band/channel
+    // change stops being applied.
+    cliPrintf("VTX CFG: grp=%d band=%d chan=%d power=%d",
+            vtxSettingsConfig()->frequencyGroup, vtxSettingsConfig()->band,
+            vtxSettingsConfig()->channel, vtxSettingsConfig()->power);
+    cliPrintLinefeed();
+    cliPrintf("VTX 3G3: band=%d chan=%d pwr=%d reqFreq=%d devFreq=%d",
+            sa3G3Band, sa3G3Channel, sa3G3Power,
+            vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel), saDevice.freq);
     cliPrintLinefeed();
 #endif
 #endif
