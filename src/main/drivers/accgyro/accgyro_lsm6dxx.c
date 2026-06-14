@@ -293,6 +293,7 @@ bool lsm6dGyroDetect(gyroDev_t *gyro)
     gyro->readFn = lsm6dxxGyroRead;
     gyro->intStatusFn = gyroCheckDataReady;
     gyro->scale = (lsm6dID == LSM6DSV16X_CHIP_ID) ? 0.070f : (1.0f / 16.4f);
+    gyro->gyroAlign = gyro->busDev->param;
     return true;
 
 }
