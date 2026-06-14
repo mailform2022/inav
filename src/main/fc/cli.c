@@ -68,6 +68,7 @@ bool cliMode = false;
 #include "drivers/time.h"
 #include "drivers/usb_msc.h"
 #include "drivers/vtx_common.h"
+#include "io/vtx_smartaudio.h"
 #include "drivers/light_ws2811strip.h"
 
 #include "fc/fc_core.h"
@@ -3835,6 +3836,23 @@ static void cliStatus(char *cmdline)
 #endif
 
     cliPrintLinefeed();
+
+#if defined(USE_VTX_CONTROL) && defined(USE_VTX_SMARTAUDIO)
+    // DIAG: dump raw SmartAudio settings to analyze unknown VTX power handling.
+    cliPrintf("VTX SA: ver=%d power=%d/%d mode=0x%x chan=%d freq=%d",
+            saDevice.version, saDevice.power, saPowerCount, saDevice.mode, saDevice.channel, saDevice.freq);
+    cliPrintLinefeed();
+    cliPrintf("VTX SA pwrtbl dbm:");
+    for (int i = 0; i < saPowerCount; i++) {
+        cliPrintf(" %d(%dmW)", saPowerTable[i].dbi, saPowerTable[i].mW);
+    }
+    cliPrintLinefeed();
+    cliPrintf("VTX SA settings raw:");
+    for (int i = 0; i < saLastSettingsLen; i++) {
+        cliPrintf(" %02X", saLastSettings[i]);
+    }
+    cliPrintLinefeed();
+#endif
 #endif
 
     if (featureConfigured(FEATURE_GPS) && (gpsConfig()->provider == GPS_UBLOX || gpsConfig()->provider == GPS_UBLOX7PLUS)) {

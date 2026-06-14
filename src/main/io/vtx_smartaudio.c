@@ -152,6 +152,17 @@ static smartAudioDevice_t saDevicePrev = {
 // back and to avoid re-sending the set command every cycle.
 static uint8_t sa3G3Band = 0;
 static uint8_t sa3G3Channel = 0;
+// Power index requested while on the 3G3 grid. The FF3741 controls power on its
+// own (button/auto-ramp), so we always command the device's maximum power, but
+// report back the requested index so the control loop converges and does not
+// keep re-sending SET_POWER (which would starve the band/channel commands).
+static uint8_t sa3G3Power = 0;
+
+// DIAG: remember the last GET_SETTINGS response so `status` can dump the raw
+// frame for analyzing how an unknown SmartAudio VTX (e.g. FF3741) reports its
+// version and power levels.
+uint8_t saLastSettings[16];
+uint8_t saLastSettingsLen = 0;
 
 // XXX Possible compliance problem here. Need LOCK/UNLOCK menu?
 static uint8_t saLockMode = SA_MODE_SET_UNLOCK; // saCms variable?
@@ -300,6 +311,10 @@ static void saProcessResponse(uint8_t *buf, int len)
         if (len < 7) {
             break;
         }
+
+        // DIAG: snapshot the raw settings frame for `status` analysis.
+        saLastSettingsLen = (len > (int)sizeof(saLastSettings)) ? sizeof(saLastSettings) : len;
+        memcpy(saLastSettings, buf, saLastSettingsLen);
 
         // From spec: "Bit 7-3 is holding the Smart audio version where 0 is V1, 1 is V2, 2 is V2.1"
         // saDevice.version = 0 means unknown, 1 means Smart audio V1, 2 means Smart audio V2 and 3 means Smart audio V2.1
@@ -835,6 +850,18 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         return;
     }
 
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // FF3741 on the 3.3 GHz grid: power is governed by the VTX itself
+        // (button / auto-ramp), so always command the device's maximum power.
+        // Remember the requested index so vtxSAGetPowerIndex() reports it back
+        // and the control loop converges instead of continuously re-sending
+        // SET_POWER (which would block band/channel changes).
+        sa3G3Power = index;
+        if (saPowerCount > 0) {
+            index = saPowerCount;
+        }
+    }
+
     LOG_DEBUG(VTX, "saSetPowerByIndex: index %d, value %d\r\n", index, buf[4]);
 
     index--;
@@ -937,6 +964,13 @@ static bool vtxSAGetPowerIndex(const vtxDevice_t *vtxDevice, uint8_t *pIndex)
 {
     if (!vtxSAIsReady(vtxDevice)) {
         return false;
+    }
+
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && sa3G3Power) {
+        // Report the requested level (we always drive the device to max) so the
+        // control loop stops re-sending SET_POWER and band/channel changes flow.
+        *pIndex = sa3G3Power;
+        return true;
     }
 
     *pIndex = ((saDevice.version == SA_1_0) ? saDacToPowerIndex(saDevice.power) : saDevice.power);

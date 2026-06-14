@@ -98,6 +98,8 @@ extern smartAudioDevice_t saDevice;
 extern saPowerTable_t saPowerTable[];
 
 extern uint8_t saPowerCount;
+extern uint8_t saLastSettings[16];
+extern uint8_t saLastSettingsLen;
 extern const char * saPowerNames[VTX_SMARTAUDIO_MAX_POWER_COUNT + 1];
 extern smartAudioStat_t saStat;
 
