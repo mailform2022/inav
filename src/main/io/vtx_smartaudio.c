@@ -673,23 +673,6 @@ void saSetBandAndChannel(uint8_t band, uint8_t channel)
     saQueueCmd(buf, 6);
 }
 
-// Queue the configured 3.3 GHz power. The FF3741 reports a bogus power table, so
-// command power directly in dBm from the 3.3 GHz grid (25 mW / 2 W / 5 W ->
-// ~14 / 33 / 37 dBm) instead of the device's index/table.
-static void sa3G3QueuePower(void)
-{
-    if (saDevice.version < SA_2_1 || sa3G3Power == 0) {
-        return;
-    }
-
-    static const uint8_t sa3G3PowerDbm[3] = { 14, 33, 37 };
-    const uint8_t lvl = (sa3G3Power >= 1 && sa3G3Power <= 3) ? (sa3G3Power - 1) : 2;
-    uint8_t buf[6] = { 0xAA, 0x55, SACMD(SA_CMD_SET_POWER), 1 };
-    buf[4] = sa3G3PowerDbm[lvl] | 128; // MSB set => power is in dBm
-    buf[5] = CRC8(buf, 5);
-    saQueueCmd(buf, 6);
-}
-
 void saSetMode(int mode)
 {
     static uint8_t buf[6] = { 0xAA, 0x55, SACMD(SA_CMD_SET_MODE), 1 };
@@ -876,12 +859,13 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 reports a bogus SmartAudio power table, so the stock index ->
-        // table lookup drives it to a wrong (low) level. Remember the requested
-        // index (vtxSAGetPowerIndex() reports it back so the control loop
-        // converges) and command power directly in dBm from the 3.3 GHz grid.
+        // FF3741 reports a bogus 2-level SmartAudio power table. Commanding
+        // power over SmartAudio (by index or by dBm) drives the RF output to a
+        // wrong/low level and makes it jump around. The device is most stable
+        // and at full output when left at its button-configured (max) power, so
+        // do NOT send SET_POWER on this grid. Remember the requested index only
+        // so the status/OSD report it and the common scheduler converges.
         sa3G3Power = index;
-        sa3G3QueuePower();
         return;
     }
 
@@ -982,6 +966,14 @@ static bool vtxSAGetPowerIndex(const vtxDevice_t *vtxDevice, uint8_t *pIndex)
 {
     if (!vtxSAIsReady(vtxDevice)) {
         return false;
+    }
+
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // Power is not commanded over SmartAudio on this grid (see
+        // vtxSASetPowerByIndex); report the requested index so the scheduler
+        // converges and the OSD/status shows a sane value.
+        *pIndex = sa3G3Power;
+        return true;
     }
 
     *pIndex = ((saDevice.version == SA_1_0) ? saDacToPowerIndex(saDevice.power) : saDevice.power);
