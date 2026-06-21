@@ -3840,30 +3840,16 @@ static void cliStatus(char *cmdline)
     cliPrintLinefeed();
 
 #if defined(USE_VTX_CONTROL) && defined(USE_VTX_SMARTAUDIO)
-    // DIAG: dump raw SmartAudio settings to analyze unknown VTX power handling.
-    cliPrintf("VTX SA: ver=%d power=%d/%d mode=0x%x chan=%d freq=%d",
-            saDevice.version, saDevice.power, saPowerCount, saDevice.mode, saDevice.channel, saDevice.freq);
-    cliPrintLinefeed();
-    cliPrintf("VTX SA pwrtbl dbm:");
-    for (int i = 0; i < saPowerCount; i++) {
-        cliPrintf(" %d(%dmW)", saPowerTable[i].dbi, saPowerTable[i].mW);
+    // SmartAudio link diagnostics (helpful for 3.3 GHz / FF3741 verification).
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        cliPrintf("VTX SA: ver=%d mode=0x%x devChan=%d devFreq=%d",
+                saDevice.version, saDevice.mode, saDevice.channel, saDevice.freq);
+        cliPrintLinefeed();
+        cliPrintf("VTX 3G3: band=%d chan=%d pwr=%d gridFreq=%d",
+                sa3G3Band, sa3G3Channel, sa3G3Power,
+                vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel));
+        cliPrintLinefeed();
     }
-    cliPrintLinefeed();
-    cliPrintf("VTX SA settings raw:");
-    for (int i = 0; i < saLastSettingsLen; i++) {
-        cliPrintf(" %02X", saLastSettings[i]);
-    }
-    cliPrintLinefeed();
-    // DIAG: config vs 3G3 request vs device freq, to trace where a band/channel
-    // change stops being applied.
-    cliPrintf("VTX CFG: grp=%d band=%d chan=%d power=%d",
-            vtxSettingsConfig()->frequencyGroup, vtxSettingsConfig()->band,
-            vtxSettingsConfig()->channel, vtxSettingsConfig()->power);
-    cliPrintLinefeed();
-    cliPrintf("VTX 3G3: band=%d chan=%d pwr=%d reqFreq=%d devFreq=%d",
-            sa3G3Band, sa3G3Channel, sa3G3Power,
-            vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel), saDevice.freq);
-    cliPrintLinefeed();
 #endif
 #endif
 

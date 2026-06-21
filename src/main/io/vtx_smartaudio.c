@@ -57,6 +57,8 @@
 #define SMARTAUDIO_CMD_TIMEOUT       120    // Time until the command is considered lost
 #define SMARTAUDIO_POLLING_INTERVAL  150    // Minimum time between state polling
 #define SMARTAUDIO_POLLING_WINDOW   1000    // Time window after command polling for state change
+#define SA_3G3_POLL_INTERVAL_MS      300    // Keep polling the 3.3 GHz VTX so reconnects are noticed
+#define SA_3G3_OFFLINE_TIMEOUT_MS   1500    // No reply for this long => 3.3 GHz VTX considered offline
 
 static serialPort_t *smartAudioSerialPort = NULL;
 
@@ -146,23 +148,19 @@ static smartAudioDevice_t saDevicePrev = {
     .version = 0,
 };
 
-// 3.3 GHz (FF3741 and similar SmartAudio clones) share the SX33 3G3 grid. The
-// device tunes by direct user-frequency (its own band/channel table is 5.8 GHz
-// and can't reach 3G3), so remember the requested band/channel to report them
-// back and to avoid re-sending the set command every cycle.
+// 3.3 GHz (FF3741 and similar SmartAudio clones) use the SX33 3G3 grid. These
+// VTXes carry their own 5-band x 8-channel frequency table for 3.3 GHz, so the
+// FC switches by band/channel index (SET_CHANNEL) and the VTX maps the index to
+// the correct frequency. We must NEVER send a user-frequency command on this
+// grid: that flips the VTX into frequency mode and it stops honouring channel
+// switches. Remember the requested band/channel/power so they can be reported
+// back and re-asserted automatically when the VTX (re)connects.
 uint8_t sa3G3Band = 0;
 uint8_t sa3G3Channel = 0;
-// Power index requested while on the 3G3 grid. The FF3741 controls power on its
-// own (button/auto-ramp), so we always command the device's maximum power, but
-// report back the requested index so the control loop converges and does not
-// keep re-sending SET_POWER (which would starve the band/channel commands).
 uint8_t sa3G3Power = 0;
-
-// DIAG: remember the last GET_SETTINGS response so `status` can dump the raw
-// frame for analyzing how an unknown SmartAudio VTX (e.g. FF3741) reports its
-// version and power levels.
-uint8_t saLastSettings[16];
-uint8_t saLastSettingsLen = 0;
+// Time of the last GET_SETTINGS reply, used to detect a 3.3 GHz VTX reconnect so
+// the configured channel/power can be re-applied without a manual re-send.
+static timeMs_t sa3G3LastReplyMs = 0;
 
 // XXX Possible compliance problem here. Need LOCK/UNLOCK menu?
 static uint8_t saLockMode = SA_MODE_SET_UNLOCK; // saCms variable?
@@ -312,9 +310,8 @@ static void saProcessResponse(uint8_t *buf, int len)
             break;
         }
 
-        // DIAG: snapshot the raw settings frame for `status` analysis.
-        saLastSettingsLen = (len > (int)sizeof(saLastSettings)) ? sizeof(saLastSettings) : len;
-        memcpy(saLastSettings, buf, saLastSettingsLen);
+        // Note the time of this reply so a 3.3 GHz VTX reconnect can be detected.
+        sa3G3LastReplyMs = millis();
 
         // From spec: "Bit 7-3 is holding the Smart audio version where 0 is V1, 1 is V2, 2 is V2.1"
         // saDevice.version = 0 means unknown, 1 means Smart audio V1, 2 means Smart audio V2 and 3 means Smart audio V2.1
@@ -686,6 +683,34 @@ void saSetBandAndChannel(uint8_t band, uint8_t channel)
     saQueueCmd(buf, 6);
 }
 
+// Queue the configured 3.3 GHz power. The FF3741 reports a bogus power table, so
+// command power directly in dBm from the 3.3 GHz grid (25 mW / 2 W / 5 W ->
+// ~14 / 33 / 37 dBm) instead of the device's index/table.
+static void sa3G3QueuePower(void)
+{
+    if (saDevice.version < SA_2_1 || sa3G3Power == 0) {
+        return;
+    }
+
+    static const uint8_t sa3G3PowerDbm[3] = { 14, 33, 37 };
+    const uint8_t lvl = (sa3G3Power >= 1 && sa3G3Power <= 3) ? (sa3G3Power - 1) : 2;
+    uint8_t buf[6] = { 0xAA, 0x55, SACMD(SA_CMD_SET_POWER), 1 };
+    buf[4] = sa3G3PowerDbm[lvl] | 128; // MSB set => power is in dBm
+    buf[5] = CRC8(buf, 5);
+    saQueueCmd(buf, 6);
+}
+
+// Re-assert the configured 3.3 GHz band/channel (by index) and power. Used both
+// on a normal set and on a reconnect so the VTX always ends up in sync.
+static void sa3G3ApplyChannelAndPower(void)
+{
+    if (sa3G3Band == 0) {
+        return;
+    }
+    saSetBandAndChannel(sa3G3Band - 1, sa3G3Channel - 1);
+    sa3G3QueuePower();
+}
+
 void saSetMode(int mode)
 {
     static uint8_t buf[6] = { 0xAA, 0x55, SACMD(SA_CMD_SET_MODE), 1 };
@@ -802,6 +827,31 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
     saGetSettings();
     saSendQueue();
     }
+
+    // 3.3 GHz grid (FF3741): keep the link synchronised so band/channel/power are
+    // applied automatically after the VTX is powered up or reconnected, without a
+    // manual re-send from the configurator.
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && saDevice.version != SA_UNKNOWN) {
+        static bool wasOnline = false;
+        static timeMs_t lastPollMs = 0;
+        const bool online = (nowMs - sa3G3LastReplyMs) < SA_3G3_OFFLINE_TIMEOUT_MS;
+
+        // On a fresh (re)connect, re-apply the configured channel and power once.
+        if (online && !wasOnline) {
+            sa3G3ApplyChannelAndPower();
+            saSendQueue();
+        }
+        wasOnline = online;
+
+        // Keep polling while idle so reconnects are detected promptly (the stock
+        // poll only runs for a short window after each command).
+        if (saQueueEmpty() && (sa_outstanding == SA_CMD_NONE) &&
+            ((nowMs - lastPollMs) >= SA_3G3_POLL_INTERVAL_MS)) {
+            lastPollMs = nowMs;
+            saGetSettings();
+            saSendQueue();
+        }
+    }
 }
 
 // Interface to common VTX API
@@ -830,14 +880,12 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 stays locked in SmartAudio user-frequency mode and ignores
-        // SET_CHANNEL, so tune it by direct user frequency from the 3.3 GHz grid.
-        const uint16_t freq = vtx3G3_Bandchan2Freq(band, channel);
-        if (freq) {
-            sa3G3Band = band;
-            sa3G3Channel = channel;
-            saSetFreq(freq);
-        }
+        // FF3741 maps the SmartAudio band/channel index to its own SX33 table,
+        // so switch by index (SET_CHANNEL). Never send a user-frequency command
+        // here: that flips the VTX into frequency mode and band switching stops.
+        sa3G3Band = band;
+        sa3G3Channel = channel;
+        sa3G3ApplyChannelAndPower();
         return;
     }
 
@@ -853,19 +901,11 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
         // FF3741 reports a bogus SmartAudio power table, so the stock index ->
-        // table lookup drives it to a wrong (low) level. Command power directly
-        // in dBm from the 3.3 GHz grid (25 mW / 2 W / 5 W -> ~14 / 33 / 37 dBm)
-        // so the level is controllable and the top level is the real maximum.
-        // Remember the requested index so vtxSAGetPowerIndex() reports it back
-        // and the control loop converges instead of continuously re-sending.
-        static const uint8_t sa3G3PowerDbm[3] = { 14, 33, 37 };
+        // table lookup drives it to a wrong (low) level. Remember the requested
+        // index (vtxSAGetPowerIndex() reports it back so the control loop
+        // converges) and command power directly in dBm from the 3.3 GHz grid.
         sa3G3Power = index;
-        if (saDevice.version >= SA_2_1) {
-            const uint8_t lvl = (index >= 1 && index <= 3) ? (index - 1) : 2;
-            buf[4] = sa3G3PowerDbm[lvl] | 128; // MSB set => power is in dBm
-            buf[5] = CRC8(buf, 5);
-            saQueueCmd(buf, 6);
-        }
+        sa3G3QueuePower();
         return;
     }
 
@@ -955,17 +995,11 @@ static bool vtxSAGetBandAndChannel(const vtxDevice_t *vtxDevice, uint8_t *pBand,
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 runs in user-frequency mode; report the requested band/channel
-        // once the device confirms it is running at that user frequency, so the
-        // control loop stops re-sending the set command.
-        if ((saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) && sa3G3Band &&
-            saDevice.freq == vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel)) {
-            *pBand = sa3G3Band;
-            *pChannel = sa3G3Channel;
-        } else {
-            *pBand = 0;
-            *pChannel = 0;
-        }
+        // Report the requested band/channel; the device read-back is unreliable
+        // on these clones, and the reconnect re-assert in vtxSAProcess keeps the
+        // VTX in sync, so the common scheduler can converge on the cached value.
+        *pBand = sa3G3Band;
+        *pChannel = sa3G3Channel;
         return true;
     }
 
@@ -1011,10 +1045,9 @@ static bool vtxSAGetFreq(const vtxDevice_t *vtxDevice, uint16_t *pFreq)
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 runs in user-frequency mode; report the device's actual user
-        // frequency, falling back to the requested grid frequency.
-        *pFreq = (saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) ? saDevice.freq :
-            vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel);
+        // Report the grid frequency for the requested band/channel (the VTX maps
+        // the channel index to this frequency via its own SX33 table).
+        *pFreq = vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel);
         return true;
     }
 

@@ -98,8 +98,6 @@ extern smartAudioDevice_t saDevice;
 extern saPowerTable_t saPowerTable[];
 
 extern uint8_t saPowerCount;
-extern uint8_t saLastSettings[16];
-extern uint8_t saLastSettingsLen;
 extern uint8_t sa3G3Band;
 extern uint8_t sa3G3Channel;
 extern uint8_t sa3G3Power;
