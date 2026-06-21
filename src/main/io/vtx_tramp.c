@@ -699,6 +699,10 @@ static void vtxProtoUpdatePowerMetadata(uint16_t maxPower)
 bool vtxTrampInit(void)
 {
     serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_VTX_TRAMP);
+    if (!portConfig) {
+        // Shared port assigned to the VTX protocol auto-detector
+        portConfig = findSerialPortConfig(FUNCTION_VTX_AUTO);
+    }
 
     if (portConfig) {
         portOptions_t portOptions = 0;
@@ -717,6 +721,18 @@ bool vtxTrampInit(void)
     vtxState.protoState = VTX_STATE_RESET;
 
     return true;
+}
+
+// Release the serial port and unbind the device so the auto-detector can hand
+// the shared UART over to another protocol.
+void vtxTrampDeinit(void)
+{
+    if (vtxState.port) {
+        closeSerialPort(vtxState.port);
+        vtxState.port = NULL;
+    }
+    vtxState.protoState = VTX_STATE_RESET;
+    vtxCommonSetDevice(NULL);
 }
 
 #endif

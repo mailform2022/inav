@@ -3839,6 +3839,19 @@ static void cliStatus(char *cmdline)
 
     cliPrintLinefeed();
 
+#if defined(USE_VTX_CONTROL) && defined(USE_VTX_SMARTAUDIO) && defined(USE_VTX_TRAMP)
+    // VTX protocol auto-detect status (shared UART, SmartAudio/Tramp).
+    if (findSerialPortConfig(FUNCTION_VTX_AUTO)) {
+        vtxDevice_t *autoDev = vtxCommonDevice();
+        const char *proto = "probing";
+        if (autoDev && vtxCommonDeviceIsReady(autoDev)) {
+            vtxDevType_e t = vtxCommonGetDeviceType(autoDev);
+            proto = (t == VTXDEV_SMARTAUDIO) ? "SmartAudio" : (t == VTXDEV_TRAMP) ? "Tramp" : "unknown";
+        }
+        cliPrintLinef("VTX auto: proto=%s", proto);
+    }
+#endif
+
 #if defined(USE_VTX_CONTROL) && defined(USE_VTX_SMARTAUDIO)
     // SmartAudio link diagnostics (helpful for 3.3 GHz / FF3741 verification).
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {

@@ -31,6 +31,7 @@
 #include "config/parameter_group.h"
 #include "config/parameter_group_ids.h"
 
+#include "drivers/time.h"
 #include "drivers/vtx_common.h"
 
 #include "fc/cli.h"
@@ -41,9 +42,12 @@
 
 #include "flight/failsafe.h"
 
+#include "io/serial.h"
 #include "io/vtx.h"
 #include "io/vtx_string.h"
 #include "io/vtx_control.h"
+#include "io/vtx_smartaudio.h"
+#include "io/vtx_tramp.h"
 
 PG_REGISTER_WITH_RESET_TEMPLATE(vtxSettingsConfig_t, vtxSettingsConfig, PG_VTX_SETTINGS_CONFIG, 2);
 
@@ -160,6 +164,55 @@ static bool vtxProcessPitMode(vtxDevice_t *vtxDevice, const vtxSettingsConfig_t 
     return false;
 }
 
+#if defined(USE_VTX_SMARTAUDIO) && defined(USE_VTX_TRAMP)
+// When a serial port is assigned the FUNCTION_VTX_AUTO function, the flight
+// controller probes both protocols on that single UART and keeps the one the
+// connected VTX answers. fc_init opens SmartAudio first, so detection starts
+// there; if the device stays silent it is handed over to Tramp and back until
+// one responds, after which the protocol is locked in.
+#define VTX_AUTO_DETECT_TIMEOUT_MS 2500
+
+static void vtxAutoDetectUpdate(void)
+{
+    static bool initialized = false;
+    static bool autoMode = false;
+    static bool locked = false;
+    static bool probingTramp = false;   // false => SmartAudio is probing
+    static timeMs_t lastSwitchMs = 0;
+
+    if (!initialized) {
+        initialized = true;
+        autoMode = (findSerialPortConfig(FUNCTION_VTX_AUTO) != NULL);
+        lastSwitchMs = millis();
+    }
+
+    if (!autoMode || locked) {
+        return;
+    }
+
+    vtxDevice_t *vtxDevice = vtxCommonDevice();
+    if (vtxDevice && vtxCommonDeviceIsReady(vtxDevice)) {
+        locked = true;  // the VTX answered on this protocol; keep it
+        return;
+    }
+
+    if ((millis() - lastSwitchMs) < VTX_AUTO_DETECT_TIMEOUT_MS) {
+        return;
+    }
+    lastSwitchMs = millis();
+
+    if (probingTramp) {
+        vtxTrampDeinit();
+        vtxSmartAudioInit();
+        probingTramp = false;
+    } else {
+        vtxSmartAudioDeinit();
+        vtxTrampInit();
+        probingTramp = true;
+    }
+}
+#endif
+
 void vtxUpdate(timeUs_t currentTimeUs)
 {
     static uint8_t currentSchedule = 0;
@@ -167,6 +220,10 @@ void vtxUpdate(timeUs_t currentTimeUs)
     if (cliMode) {
         return;
     }
+
+#if defined(USE_VTX_SMARTAUDIO) && defined(USE_VTX_TRAMP)
+    vtxAutoDetectUpdate();
+#endif
 
     vtxDevice_t *vtxDevice = vtxCommonDevice();
     if (vtxDevice) {

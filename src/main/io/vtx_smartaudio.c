@@ -691,9 +691,20 @@ void saSetMode(int mode)
     saQueueCmd(buf, 6);
 }
 
+#define SA_INITPHASE_START         0
+#define SA_INITPHASE_WAIT_SETTINGS 1 // SA_CMD_GET_SETTINGS was sent and waiting for reply.
+#define SA_INITPHASE_WAIT_PITFREQ  2 // SA_FREQ_GETPIT sent and waiting for reply.
+#define SA_INITPHASE_DONE          3
+
+static char saInitPhase = SA_INITPHASE_START;
+
 bool vtxSmartAudioInit(void)
 {
     serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_VTX_SMARTAUDIO);
+    if (!portConfig) {
+        // Shared port assigned to the VTX protocol auto-detector
+        portConfig = findSerialPortConfig(FUNCTION_VTX_AUTO);
+    }
     if (portConfig) {
         portOptions_t portOptions = (vtxConfig()->smartAudioStopBits == 2 ? SERIAL_STOPBITS_2 : SERIAL_STOPBITS_1) | SERIAL_BIDIR_NOPULL;
         portOptions = portOptions | (vtxConfig()->halfDuplex ? SERIAL_BIDIR | SERIAL_BIDIR_PP : SERIAL_UNIDIR);
@@ -704,22 +715,30 @@ bool vtxSmartAudioInit(void)
         return false;
     }
 
+    saDevice.version = SA_UNKNOWN;
+    saInitPhase = SA_INITPHASE_START;
     vtxCommonSetDevice(&vtxSmartAudio);
 
     return true;
 }
 
-#define SA_INITPHASE_START         0
-#define SA_INITPHASE_WAIT_SETTINGS 1 // SA_CMD_GET_SETTINGS was sent and waiting for reply.
-#define SA_INITPHASE_WAIT_PITFREQ  2 // SA_FREQ_GETPIT sent and waiting for reply.
-#define SA_INITPHASE_DONE          3
+// Release the serial port and unbind the device so the auto-detector can hand
+// the shared UART over to another protocol.
+void vtxSmartAudioDeinit(void)
+{
+    if (smartAudioSerialPort) {
+        closeSerialPort(smartAudioSerialPort);
+        smartAudioSerialPort = NULL;
+    }
+    saDevice.version = SA_UNKNOWN;
+    saInitPhase = SA_INITPHASE_START;
+    vtxCommonSetDevice(NULL);
+}
 
 static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
 {
     UNUSED(vtxDevice);
     UNUSED(currentTimeUs);
-
-    static char initPhase = SA_INITPHASE_START;
 
     if (smartAudioSerialPort == NULL) {
         return;
@@ -733,11 +752,11 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
     // Re-evaluate baudrate after each frame reception
     saAutobaud();
 
-    switch (initPhase) {
+    switch (saInitPhase) {
     case SA_INITPHASE_START:
         saGetSettings();
         //saSendQueue();
-        initPhase = SA_INITPHASE_WAIT_SETTINGS;
+        saInitPhase = SA_INITPHASE_WAIT_SETTINGS;
         break;
 
     case SA_INITPHASE_WAIT_SETTINGS:
@@ -746,9 +765,9 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
         if (saDevice.version) {
             if (saDevice.version == SA_2_0) {
                 saSetFreq(SA_FREQ_GETPIT);
-                initPhase = SA_INITPHASE_WAIT_PITFREQ;
+                saInitPhase = SA_INITPHASE_WAIT_PITFREQ;
             } else {
-                initPhase = SA_INITPHASE_DONE;
+                saInitPhase = SA_INITPHASE_DONE;
             }
             if (saDevice.version >= SA_2_0 ) {
                 //did the device boot up in pit mode on its own?
@@ -760,7 +779,7 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
 
     case SA_INITPHASE_WAIT_PITFREQ:
         if (saDevice.orfreq) {
-            initPhase = SA_INITPHASE_DONE;
+            saInitPhase = SA_INITPHASE_DONE;
         }
         break;
 

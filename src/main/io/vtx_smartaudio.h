@@ -114,3 +114,4 @@ void saSetPowerByIndex(uint8_t index);
 void saSetFreq(uint16_t freq);
 void saSetPitFreq(uint16_t freq);
 bool vtxSmartAudioInit(void);
+void vtxSmartAudioDeinit(void);

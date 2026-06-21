@@ -51,3 +51,4 @@
 #define VTX_TRAMP_3G3_MAX_POWER_MW      5000
 
 bool vtxTrampInit(void);
+void vtxTrampDeinit(void);
