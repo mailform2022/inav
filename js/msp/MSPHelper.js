@@ -40,6 +40,7 @@ var mspHelper = (function (gui) {
         'RUNCAM_DEVICE_CONTROL': 10,
         'TBS_SMARTAUDIO': 11,
         'IRC_TRAMP': 12,
+        'VTX_AUTO': 13,
         'OPFLOW': 14,
         'LOG': 15,
         'RANGEFINDER': 16,

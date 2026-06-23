@@ -50,6 +50,14 @@ let LogicConditionsCollection = function () {
         GUI.switchery();
     };
 
+    self.refreshActivators = function () {
+        for (let k in self.get()) {
+            if (self.get().hasOwnProperty(k)) {
+                self.get()[k].renderActivator();
+            }
+        }
+    };
+
     self.onSave = function () {
         let chain = new MSPChainerClass()
 

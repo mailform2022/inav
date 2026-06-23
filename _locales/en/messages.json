@@ -1296,6 +1296,9 @@
     "portsFunction_VTX_FFPV": {
         "message": "FuriousFPV Vtx"
     },
+    "portsFunction_VTX_AUTO": {
+        "message": "VTX (auto)"
+    },
     "portsFunction_FRSKY_OSD": {
         "message": "FrSky OSD"
     },

@@ -74,6 +74,11 @@ TABS.ports.initialize = function (callback) {
         groups: ['peripherals'],
         maxPorts: 1 }
     );
+    portFunctionRules.push({
+        name: 'VTX_AUTO',
+        groups: ['peripherals'],
+        maxPorts: 1 }
+    );
 
     portFunctionRules.push({
         name: 'OPFLOW',

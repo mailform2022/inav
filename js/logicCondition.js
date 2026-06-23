@@ -74,6 +74,9 @@ let LogicCondition = function (enabled, activatorId, operation, operandAType, op
         self.setEnabled(!!$cT.prop('checked'));
         self.renderStatus();
         self.renderActivator();
+        // Enabling/disabling this condition changes which conditions every other
+        // row may select as its activator, so rebuild all activator dropdowns.
+        LOGIC_CONDITIONS.refreshActivators();
     };
 
     self.getOperatorMetadata = function () {
@@ -88,9 +91,17 @@ let LogicCondition = function (enabled, activatorId, operation, operandAType, op
         let $cT = $(event.currentTarget);
 
         self.setOperation($cT.val());
-        self.setOperandAType(0);
+
+        var defaultTypeA = 0;
+        var defaultValueA = 0;
+        var op = parseInt($cT.val(), 10);
+        if (op === 30) { defaultTypeA = 8; defaultValueA = 1; }
+        else if (op === 31) { defaultTypeA = 9; defaultValueA = 1; }
+        else if (op === 25) { defaultTypeA = 10; defaultValueA = 1; }
+
+        self.setOperandAType(defaultTypeA);
         self.setOperandBType(0);
-        self.setOperandAValue(0);
+        self.setOperandAValue(defaultValueA);
         self.setOperandBValue(0);
         self.renderOperand(0);
         self.renderOperand(1);
@@ -213,7 +224,11 @@ let LogicCondition = function (enabled, activatorId, operation, operandAType, op
     }
 
     self.renderActivator = function () {
+        if (typeof $row === 'undefined') {
+            return;
+        }
         let $e = $row.find(".logic_cell__activator");
+        $e.html("");
 
         if (self.getEnabled()) {
             GUI.renderLogicConditionSelect(
@@ -224,8 +239,6 @@ let LogicCondition = function (enabled, activatorId, operation, operandAType, op
                 true,
                 true
             );
-        } else {
-            $e.html("");
         }
     }
 
