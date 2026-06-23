@@ -57,7 +57,8 @@
 #define SMARTAUDIO_CMD_TIMEOUT       120    // Time until the command is considered lost
 #define SMARTAUDIO_POLLING_INTERVAL  150    // Minimum time between state polling
 #define SMARTAUDIO_POLLING_WINDOW   1000    // Time window after command polling for state change
-#define SA_3G3_POLL_INTERVAL_MS      300    // Keep polling the 3.3 GHz VTX so reconnects are noticed
+#define SA_3G3_POLL_INTERVAL_MS     1000    // Read-only liveness poll of the 3.3 GHz VTX (does not retune RF)
+#define SA_3G3_LINK_TIMEOUT_MS      2500    // No reply for this long => link lost; re-apply once on reconnect
 
 static serialPort_t *smartAudioSerialPort = NULL;
 
@@ -149,11 +150,27 @@ static smartAudioDevice_t saDevicePrev = {
 // FC switches by band/channel index (SET_CHANNEL) and the VTX maps the index to
 // the correct frequency. We must NEVER send a user-frequency command on this
 // grid: that flips the VTX into frequency mode and it stops honouring channel
-// switches. These remember the last requested band/channel/power for the CLI
-// status only; the device read-back still drives the common VTX scheduler.
+// switches.
+//
+// These hold the last band/channel/power actually commanded to the VTX and are
+// what the common VTX scheduler reads back (see vtxSAGetBandAndChannel /
+// vtxSAGetPowerIndex). Because the FF3741 does not report a SmartAudio
+// band/channel/power that matches what we set, reading the raw device state
+// would make the scheduler believe the change never took and re-send SET_*
+// every cycle -- that constant retuning is what corrupts the video (bars,
+// jitter). Reporting the commanded value instead gives "send once and
+// converge": one command per change, no periodic re-tuning. A reconnect
+// watchdog (vtxSAProcess) resets these so a single re-apply happens after the
+// VTX is power-cycled. A sentinel of 0 means "not applied yet / force resend".
 uint8_t sa3G3Band = 0;
 uint8_t sa3G3Channel = 0;
 uint8_t sa3G3Power = 0;
+
+// 3G3 grid power levels are 25 mW / 2 W / 5 W (see vtx3G3DefaultPowerNames).
+// The FF3741 advertises a bogus SmartAudio power table, so we ignore the
+// device table and command power by absolute dBm (V2.1) computed from these
+// real grid levels. Index 1..3 maps to {14, 33, 37} dBm (= 25 mW, 2 W, 5 W).
+static const uint8_t sa3G3PowerDbm[3] = { 14, 33, 37 };
 
 // XXX Possible compliance problem here. Need LOCK/UNLOCK menu?
 static uint8_t saLockMode = SA_MODE_SET_UNLOCK; // saCms variable?
@@ -809,24 +826,48 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
     saSendQueue();
     }
 
-    // 3.3 GHz grid (FF3741): keep the link synchronised so band/channel/power are
-    // applied automatically after the VTX is powered up or reconnected, without a
-    // manual re-send from the configurator.
+    // 3.3 GHz grid (FF3741): do NOT periodically re-send band/channel/power.
+    // The scheduler now applies each setting once (it reads back the commanded
+    // value, see vtxSAGetBandAndChannel/vtxSAGetPowerIndex), so the only thing
+    // left to do here is (a) a slow read-only liveness poll and (b) a reconnect
+    // watchdog that forces a single re-apply after the VTX is power-cycled.
+    // GET_SETTINGS is a query and does not retune the RF, so it does not disturb
+    // the video the way a periodic SET_* would.
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && saDevice.version != SA_UNKNOWN) {
         static timeMs_t lastPollMs = 0;
+        static uint16_t lastRcvd = 0;
+        static timeMs_t lastRcvChangeMs = 0;
+        static bool linkLost = false;
+        static bool initialised = false;
 
-        // Keep polling the device while idle so its real band/channel/power stay
-        // fresh. The common VTX scheduler compares that fresh read-back with the
-        // configured value and re-applies on any mismatch, so band/channel/power
-        // are restored automatically after the FF3741 is powered up/reconnected,
-        // without a manual re-send from the configurator. The stock poll only
-        // runs for a short window after each command, which is why a reconnect
-        // would otherwise go unnoticed.
+        if (!initialised) {
+            initialised = true;
+            lastRcvd = saStat.pktrcvd;
+            lastRcvChangeMs = nowMs;
+        }
+
+        // Read-only liveness poll while idle.
         if (saQueueEmpty() && (sa_outstanding == SA_CMD_NONE) &&
             ((nowMs - lastPollMs) >= SA_3G3_POLL_INTERVAL_MS)) {
             lastPollMs = nowMs;
             saGetSettings();
             saSendQueue();
+        }
+
+        // Reconnect watchdog: track replies. If they stop for too long the link
+        // is down; when they resume, clear the commanded state so the common
+        // scheduler re-applies band/channel/power exactly once.
+        if (saStat.pktrcvd != lastRcvd) {
+            lastRcvd = saStat.pktrcvd;
+            lastRcvChangeMs = nowMs;
+            if (linkLost) {
+                linkLost = false;
+                sa3G3Band = 0;      // sentinel -> one SET_CHANNEL
+                sa3G3Channel = 0;
+                sa3G3Power = 0;     // sentinel -> one SET_POWER
+            }
+        } else if (!linkLost && ((nowMs - lastRcvChangeMs) >= SA_3G3_LINK_TIMEOUT_MS)) {
+            linkLost = true;
         }
     }
 }
@@ -860,9 +901,9 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         // FF3741 maps the SmartAudio band/channel index to its own SX33 table,
         // so switch by index (SET_CHANNEL) exactly like a stock SmartAudio VTX.
         // Never send a user-frequency command here: that flips the VTX into
-        // frequency mode and band switching stops. Track the request for the
-        // CLI status only; the getters still read the real device so the common
-        // scheduler keeps retrying until the VTX confirms the change.
+        // frequency mode and band switching stops. Record the commanded value:
+        // the getter reports it back so the scheduler converges after this single
+        // SET_CHANNEL instead of re-sending every cycle (which corrupts video).
         sa3G3Band = band;
         sa3G3Channel = channel;
     }
@@ -878,13 +919,19 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 reports a bogus 2-level SmartAudio power table. Commanding
-        // power over SmartAudio (by index or by dBm) drives the RF output to a
-        // wrong/low level and makes it jump around. The device is most stable
-        // and at full output when left at its button-configured (max) power, so
-        // do NOT send SET_POWER on this grid. Remember the requested index only
-        // so the status/OSD report it and the common scheduler converges.
-        sa3G3Power = index;
+        // FF3741 reports a bogus SmartAudio power table, so we cannot trust
+        // saPowerTable here. The device speaks SmartAudio V2.1, which accepts an
+        // absolute power in dBm (MSB set). Command the dBm that matches the real
+        // 3G3 grid level (25 mW / 2 W / 5 W => 14 / 33 / 37 dBm) so the top
+        // level actually drives 5 W. This is sent once per change (the getter
+        // reports the commanded index back, so the scheduler does not re-send
+        // every cycle), which keeps the video stable.
+        if (index >= 1 && index <= 3) {
+            buf[4] = sa3G3PowerDbm[index - 1] | 128; // dBm, MSB = "set power by dBm"
+            buf[5] = CRC8(buf, 5);
+            saQueueCmd(buf, 6);
+            sa3G3Power = index;
+        }
         return;
     }
 
@@ -973,6 +1020,17 @@ static bool vtxSAGetBandAndChannel(const vtxDevice_t *vtxDevice, uint8_t *pBand,
         return false;
     }
 
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // Report the band/channel we last commanded, not the FF3741 read-back
+        // (which does not map to our SET_CHANNEL index). This makes the common
+        // scheduler send one SET_CHANNEL per change and then converge, instead
+        // of re-tuning every cycle. sa3G3Band == 0 is the "force resend"
+        // sentinel used after a reconnect (see vtxSAProcess watchdog).
+        *pBand = sa3G3Band;
+        *pChannel = sa3G3Channel;
+        return true;
+    }
+
     // if in user-freq mode then report band as zero
     *pBand = (saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) ? 0 :
         (SA_DEVICE_CHVAL_TO_BAND(saDevice.channel) + 1);
@@ -988,9 +1046,10 @@ static bool vtxSAGetPowerIndex(const vtxDevice_t *vtxDevice, uint8_t *pIndex)
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // Power is not commanded over SmartAudio on this grid (see
-        // vtxSASetPowerByIndex); report the requested index so the scheduler
-        // converges and the OSD/status shows a sane value.
+        // Report the last commanded power index, not the FF3741 read-back (its
+        // power table is bogus). This makes the scheduler send one SET_POWER per
+        // change and then converge instead of re-commanding every cycle.
+        // sa3G3Power == 0 is the "force resend" sentinel used after a reconnect.
         *pIndex = sa3G3Power;
         return true;
     }
