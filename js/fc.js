@@ -1378,63 +1378,6 @@ var FC = {
                     13: "Next WP has User Action 4",
                 }
             },
-            8: {
-                name: "VTx Band",
-                type: "dictionary",
-                default: 1,
-                values: (function() {
-                    var vals = {};
-                    if (typeof VTX !== 'undefined' && VTX.customVtxTable && VTX.customVtxTable.bands_list) {
-                        for (var i = 0; i < VTX.customVtxTable.bands_list.length; i++) {
-                            vals[i + 1] = VTX.customVtxTable.bands_list[i].name || ('Band ' + (i + 1));
-                        }
-                    } else {
-                        vals[1] = 'Boscam A';
-                        vals[2] = 'Boscam B';
-                        vals[3] = 'Boscam E';
-                        vals[4] = 'Fatshark';
-                        vals[5] = 'Raceband';
-                    }
-                    return vals;
-                })()
-            },
-            9: {
-                name: "VTx Channel",
-                type: "dictionary",
-                default: 1,
-                values: (function() {
-                    var vals = {};
-                    if (typeof VTX !== 'undefined' && VTX.customVtxTable && VTX.customVtxTable.bands_list && VTX.customVtxTable.bands_list[0]) {
-                        var chCount = VTX.customVtxTable.bands_list[0].frequencies.length;
-                        for (var i = 0; i < chCount; i++) {
-                            vals[i + 1] = 'CH ' + (i + 1);
-                        }
-                    } else {
-                        for (var j = 1; j <= 8; j++) {
-                            vals[j] = 'CH ' + j;
-                        }
-                    }
-                    return vals;
-                })()
-            },
-            10: {
-                name: "VTx Power Level",
-                type: "dictionary",
-                default: 1,
-                values: (function() {
-                    var vals = {};
-                    if (typeof VTX !== 'undefined' && VTX.customVtxTable && VTX.customVtxTable.powerLevels) {
-                        for (var i = 0; i < VTX.customVtxTable.powerLevels.length; i++) {
-                            vals[i + 1] = VTX.customVtxTable.powerLevels[i] + ' mW';
-                        }
-                    } else {
-                        vals[1] = 'Power 1';
-                        vals[2] = 'Power 2';
-                        vals[3] = 'Power 3';
-                    }
-                    return vals;
-                })()
-            },
         }
     },
     getBatteryProfileParameters: function () {

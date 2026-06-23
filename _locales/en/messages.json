@@ -1188,6 +1188,33 @@
     "configurationVTX": {
         "message": "VTX"
     },
+    "configurationVTXCustomGridHelp": {
+        "message": "Load a custom VTX grid (JSON) for the transmitter you use (bands, channels, frequencies and power levels). The grid is also used by the Programming tab. If no grid is loaded, the standard INAV bands are used."
+    },
+    "configurationVTXCustomGridLoad": {
+        "message": "Load Grid (JSON)"
+    },
+    "configurationVTXCustomGridClear": {
+        "message": "Clear Grid"
+    },
+    "configurationVTXCustomGridNone": {
+        "message": "No custom grid loaded - using standard INAV bands."
+    },
+    "configurationVTXCustomGridLoaded": {
+        "message": "Loaded: $name$ ($bands$ bands x $channels$ channels, $powers$ power levels).",
+        "placeholders": {
+            "name": { "content": "$1" },
+            "bands": { "content": "$2" },
+            "channels": { "content": "$3" },
+            "powers": { "content": "$4" }
+        }
+    },
+    "configurationVTXCustomGridError": {
+        "message": "Invalid grid file: $error$",
+        "placeholders": {
+            "error": { "content": "$1" }
+        }
+    },
     "configurationVTXBand": {
         "message": "Band"
     },

@@ -275,3 +275,28 @@ hr {
     vertical-align: top;
     margin-top: 3px;
 }
+.vtx_custom_grid {
+    margin-bottom: 10px;
+}
+
+.vtx_custom_grid_controls {
+    margin: 6px 0;
+}
+
+.vtx_custom_grid_controls .regular-button {
+    margin-right: 6px;
+}
+
+.vtx_custom_grid_status {
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.vtx_custom_grid_status--ok {
+    color: #3c763d;
+}
+
+.vtx_custom_grid_status--error {
+    color: #a94442;
+    font-weight: bold;
+}

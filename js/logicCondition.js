@@ -1,4 +1,4 @@
-/*global $,FC*/
+/*global $,FC,GUI,VTX,LOGIC_CONDITIONS*/
 'use strict';
 
 let LogicCondition = function (enabled, activatorId, operation, operandAType, operandAValue, operandBType, operandBValue, flags) {
@@ -92,20 +92,33 @@ let LogicCondition = function (enabled, activatorId, operation, operandAType, op
 
         self.setOperation($cT.val());
 
-        var defaultTypeA = 0;
-        var defaultValueA = 0;
-        var op = parseInt($cT.val(), 10);
-        if (op === 30) { defaultTypeA = 8; defaultValueA = 1; }
-        else if (op === 31) { defaultTypeA = 9; defaultValueA = 1; }
-        else if (op === 25) { defaultTypeA = 10; defaultValueA = 1; }
-
-        self.setOperandAType(defaultTypeA);
+        // Set VTx Band/Channel/Power Level use a plain Value operand (the
+        // firmware only knows operand types 0..7); the value itself is a 1-based
+        // index into the active VTX grid, so default it to the first entry.
+        self.setOperandAType(0);
         self.setOperandBType(0);
-        self.setOperandAValue(defaultValueA);
+        self.setOperandAValue(self.isVtxSetOperation() ? 1 : 0);
         self.setOperandBValue(0);
         self.renderOperand(0);
         self.renderOperand(1);
         self.renderStatus();
+    };
+
+    self.isVtxSetOperation = function () {
+        let op = parseInt(self.getOperation(), 10);
+        return op === 25 || op === 30 || op === 31;
+    };
+
+    self.getVtxOperandList = function () {
+        let op = parseInt(self.getOperation(), 10);
+        if (op === 30) {
+            return VTX.getProgrammingBandList();
+        } else if (op === 31) {
+            return VTX.getProgrammingChannelList();
+        } else if (op === 25) {
+            return VTX.getProgrammingPowerList();
+        }
+        return [];
     };
 
     self.onOperatorTypeChange = function (event) {
@@ -149,6 +162,30 @@ let LogicCondition = function (enabled, activatorId, operation, operandAType, op
         }
 
         $container.html('');
+
+        // Set VTx Band/Channel/Power Level: render a single grid-driven dropdown
+        // instead of the generic type/value pair. The operand is always type
+        // Value and the option values are 1-based indices the firmware expects.
+        if (operand == 0 && self.isVtxSetOperation()) {
+            if (parseInt(type, 10) !== 0) {
+                self.setOperandAType(0);
+                type = 0;
+            }
+            $container.append('<select class="logic_element__operand--value" data-operand="0"></select>');
+            let $v = $container.find('.logic_element__operand--value');
+            let list = self.getVtxOperandList();
+            list.forEach(function (item) {
+                $v.append('<option value="' + item.value + '">' + item.label + '</option>');
+            });
+            $v.val(value);
+            if (!$v.val() && list.length) {
+                $v.val(list[0].value);
+                self.setOperandAValue(list[0].value);
+            }
+            $v.change(self.onOperatorValueChange);
+            return;
+        }
+
         if (self.hasOperand(operand)) {
             
             $container.append('<select class="logic_element__operand--type" data-operand="' + operand + '"></select>');

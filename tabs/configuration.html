@@ -202,34 +202,47 @@
                 </div>
                 <div class="spacer_box">
                     <div class="info-box" data-i18n="vtxDisclaimer"></div>
-                    <div class="note" id="vtx_no_band">
-                        <div class="note_spacer">
-                            <p data-i18n="configurationVTXNoBandHelp"></p>
+
+                    <div class="vtx_custom_grid">
+                        <div class="info-box" data-i18n="configurationVTXCustomGridHelp"></div>
+                        <div class="vtx_custom_grid_controls">
+                            <a class="regular-button" id="vtx_grid_load" href="#" data-i18n="configurationVTXCustomGridLoad"></a>
+                            <a class="regular-button" id="vtx_grid_clear" href="#" data-i18n="configurationVTXCustomGridClear"></a>
+                            <input type="file" id="vtx_grid_file" accept=".json,application/json" style="display:none" />
                         </div>
+                        <div class="vtx_custom_grid_status" id="vtx_grid_status"></div>
                     </div>
 
-                    <div class="select vtx_band_wrapper">
-                        <select id="vtx_band"></select>
-                        <label for="vtx_band">
-                            <span data-i18n="configurationVTXBand"></span>
-                        </label>
-                    </div>
+                    <div id="vtx_device_settings">
+                        <div class="note" id="vtx_no_band">
+                            <div class="note_spacer">
+                                <p data-i18n="configurationVTXNoBandHelp"></p>
+                            </div>
+                        </div>
 
-                    <div class="select vtx_channel_wrapper">
-                        <select id="vtx_channel"></select>
-                        <label for="vtx_channel"> <span data-i18n="configurationVTXChannel"></span></label>
-                    </div>
+                        <div class="select vtx_band_wrapper">
+                            <select id="vtx_band"></select>
+                            <label for="vtx_band">
+                                <span data-i18n="configurationVTXBand"></span>
+                            </label>
+                        </div>
 
-                    <div class="select">
-                        <select id="vtx_power" data-setting-placeholder="vtx_power"></select>
-                        <label for="vtx_power"><span data-i18n="configurationVTXPower"></span></label>
-                        <div for="vtx_power" class="helpicon cf_tip" data-i18n_title="configurationVTXPowerHelp"></div>
-                    </div>
+                        <div class="select vtx_channel_wrapper">
+                            <select id="vtx_channel"></select>
+                            <label for="vtx_channel"> <span data-i18n="configurationVTXChannel"></span></label>
+                        </div>
 
-                    <div class="select">
-                        <select id="vtx_low_power_disarm" data-setting-placeholder="vtx_low_power_disarm"></select>
-                        <label for="vtx_low_power_disarm"><span data-i18n="configurationVTXLowerPowerDisarm"></span></label>
-                        <div for="vtx_low_power_disarm" class="helpicon cf_tip" data-i18n_title="configurationVTXLowerPowerDisarmHelp"></div>
+                        <div class="select">
+                            <select id="vtx_power" data-setting-placeholder="vtx_power"></select>
+                            <label for="vtx_power"><span data-i18n="configurationVTXPower"></span></label>
+                            <div for="vtx_power" class="helpicon cf_tip" data-i18n_title="configurationVTXPowerHelp"></div>
+                        </div>
+
+                        <div class="select">
+                            <select id="vtx_low_power_disarm" data-setting-placeholder="vtx_low_power_disarm"></select>
+                            <label for="vtx_low_power_disarm"><span data-i18n="configurationVTXLowerPowerDisarm"></span></label>
+                            <div for="vtx_low_power_disarm" class="helpicon cf_tip" data-i18n_title="configurationVTXLowerPowerDisarmHelp"></div>
+                        </div>
                     </div>
                 </div>
             </div>

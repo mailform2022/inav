@@ -115,79 +115,157 @@ TABS.configuration.initialize = function (callback, scrollPosition) {
 
         // VTX
         var config_vtx = $('.config-vtx');
-        if (VTX_CONFIG.device_type != VTX.DEV_UNKNOWN) {
+        config_vtx.show();
+
+        function renderVtxGridStatus() {
+            var $status = $('#vtx_grid_status');
+            if (VTX.hasCustomGrid()) {
+                var t = VTX.customVtxTable;
+                var summary = chrome.i18n.getMessage('configurationVTXCustomGridLoaded', [
+                    t.name,
+                    String(t.bands_list.length),
+                    String(t.bands_list[0].frequencies.length),
+                    String(t.powerLevels.length)
+                ]);
+                $status.removeClass('vtx_custom_grid_status--error').addClass('vtx_custom_grid_status--ok').text(summary);
+                $('#vtx_grid_clear').show();
+            } else {
+                $status.removeClass('vtx_custom_grid_status--error vtx_custom_grid_status--ok')
+                    .text(chrome.i18n.getMessage('configurationVTXCustomGridNone'));
+                $('#vtx_grid_clear').hide();
+            }
+        }
+
+        function renderVtxDeviceSettings() {
+            var $deviceSettings = $('#vtx_device_settings');
+            if (VTX_CONFIG.device_type == VTX.DEV_UNKNOWN) {
+                $deviceSettings.hide();
+                return;
+            }
+            $deviceSettings.show();
+
+            var bands = VTX.getBands();
 
             var vtx_band = $('#vtx_band');
             vtx_band.empty();
             var vtx_no_band_note = $('#vtx_no_band');
-            if (VTX_CONFIG.band < VTX.BAND_MIN || VTX_CONFIG.band > VTX.BAND_MAX) {
+            if (VTX_CONFIG.band < VTX.BAND_MIN || VTX_CONFIG.band > bands.length) {
                 var noBandName = chrome.i18n.getMessage("configurationNoBand");
                 $('<option value="0">' + noBandName + '</option>').appendTo(vtx_band);
                 vtx_no_band_note.show();
             } else {
                 vtx_no_band_note.hide();
             }
-            for (var ii = 0; ii < VTX.BANDS.length; ii++) {
-                var band_name = VTX.BANDS[ii].name;
-                var option = $('<option value="' + VTX.BANDS[ii].code + '">' + band_name + '</option>');
-                if (VTX.BANDS[ii].code == VTX_CONFIG.band) {
+            for (var ii = 0; ii < bands.length; ii++) {
+                var band_name = bands[ii].name;
+                var option = $('<option value="' + bands[ii].code + '">' + band_name + '</option>');
+                if (bands[ii].code == VTX_CONFIG.band) {
                     option.prop('selected', true);
                 }
                 option.appendTo(vtx_band);
             }
-            vtx_band.change(function () {
+            vtx_band.off('change').change(function () {
                 VTX_CONFIG.band = parseInt($(this).val());
             });
 
             var vtx_channel = $('#vtx_channel');
             vtx_channel.empty();
-            for (var ii = VTX.CHANNEL_MIN; ii <= VTX.CHANNEL_MAX; ii++) {
-                var option = $('<option value="' + ii + '">' + ii + '</option>');
-                if (ii == VTX_CONFIG.channel) {
+            var channelCount = VTX.getChannelCount();
+            for (var ci = VTX.CHANNEL_MIN; ci <= channelCount; ci++) {
+                var chLabel = String(ci);
+                var freq = VTX.getFrequency(VTX_CONFIG.band, ci);
+                if (freq != null) {
+                    chLabel = ci + ' (' + freq + ' MHz)';
+                }
+                var option = $('<option value="' + ci + '">' + chLabel + '</option>');
+                if (ci == VTX_CONFIG.channel) {
                     option.prop('selected', true);
                 }
                 option.appendTo(vtx_channel);
             }
-            vtx_channel.change(function () {
+            vtx_channel.off('change').change(function () {
                 VTX_CONFIG.channel = parseInt($(this).val());
             });
 
             var vtx_power = $('#vtx_power');
             vtx_power.empty();
-            var minPower = VTX.getMinPower(VTX_CONFIG.device_type);
-            var maxPower = VTX.getMaxPower(VTX_CONFIG.device_type);
-            for (var ii = minPower; ii <= maxPower; ii++) {
-                var option = $('<option value="' + ii + '">' + ii + '</option>');
-                if (ii == VTX_CONFIG.power) {
-                    option.prop('selected', true);
+            if (VTX.hasCustomGrid()) {
+                var powerList = VTX.getProgrammingPowerList();
+                for (var pi = 0; pi < powerList.length; pi++) {
+                    var pOption = $('<option value="' + powerList[pi].value + '">' + powerList[pi].label + '</option>');
+                    if (powerList[pi].value == VTX_CONFIG.power) {
+                        pOption.prop('selected', true);
+                    }
+                    pOption.appendTo(vtx_power);
                 }
-                option.appendTo(vtx_power);
+            } else {
+                var minPower = VTX.getMinPower(VTX_CONFIG.device_type);
+                var maxPower = VTX.getMaxPower(VTX_CONFIG.device_type);
+                for (var pp = minPower; pp <= maxPower; pp++) {
+                    var ppOption = $('<option value="' + pp + '">' + pp + '</option>');
+                    if (pp == VTX_CONFIG.power) {
+                        ppOption.prop('selected', true);
+                    }
+                    ppOption.appendTo(vtx_power);
+                }
             }
-            vtx_power.change(function () {
+            vtx_power.off('change').change(function () {
                 VTX_CONFIG.power = parseInt($(this).val());
             });
 
             var vtx_low_power_disarm = $('#vtx_low_power_disarm');
             vtx_low_power_disarm.empty();
-            for (var ii = VTX.LOW_POWER_DISARM_MIN; ii <= VTX.LOW_POWER_DISARM_MAX; ii++) {
-                var name = chrome.i18n.getMessage("configurationVTXLowPowerDisarmValue_" + ii);
+            for (var li = VTX.LOW_POWER_DISARM_MIN; li <= VTX.LOW_POWER_DISARM_MAX; li++) {
+                var name = chrome.i18n.getMessage("configurationVTXLowPowerDisarmValue_" + li);
                 if (!name) {
-                    name = ii;
+                    name = li;
                 }
-                var option = $('<option value="' + ii + '">' + name + '</option>');
-                if (ii == VTX_CONFIG.low_power_disarm) {
-                    option.prop('selected', true);
+                var lpOption = $('<option value="' + li + '">' + name + '</option>');
+                if (li == VTX_CONFIG.low_power_disarm) {
+                    lpOption.prop('selected', true);
                 }
-                option.appendTo(vtx_low_power_disarm);
+                lpOption.appendTo(vtx_low_power_disarm);
             }
-            vtx_low_power_disarm.change(function () {
+            vtx_low_power_disarm.off('change').change(function () {
                 VTX_CONFIG.low_power_disarm = parseInt($(this).val());
             });
-
-            config_vtx.show();
-        } else {
-            config_vtx.hide();
         }
+
+        $('#vtx_grid_load').off('click').on('click', function (e) {
+            e.preventDefault();
+            $('#vtx_grid_file').val('').trigger('click');
+        });
+
+        $('#vtx_grid_file').off('change').on('change', function (e) {
+            var file = e.target.files && e.target.files[0];
+            if (!file) {
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                var $status = $('#vtx_grid_status');
+                try {
+                    var normalized = VTX.normalizeGrid(JSON.parse(ev.target.result));
+                    VTX.setCustomGrid(normalized);
+                    renderVtxGridStatus();
+                    renderVtxDeviceSettings();
+                } catch (err) {
+                    $status.removeClass('vtx_custom_grid_status--ok').addClass('vtx_custom_grid_status--error')
+                        .text(chrome.i18n.getMessage('configurationVTXCustomGridError', [err.message]));
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        $('#vtx_grid_clear').off('click').on('click', function (e) {
+            e.preventDefault();
+            VTX.clearCustomGrid();
+            renderVtxGridStatus();
+            renderVtxDeviceSettings();
+        });
+
+        renderVtxGridStatus();
+        renderVtxDeviceSettings();
 
         // for some odd reason chrome 38+ changes scroll according to the touched select element
         // i am guessing this is a bug, since this wasn't happening on 37
