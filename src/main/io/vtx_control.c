@@ -41,7 +41,7 @@
 
 #if defined(USE_VTX_CONTROL)
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 4);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 5);
 
 PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .halfDuplex = SETTING_VTX_HALFDUPLEX_DEFAULT,
@@ -49,6 +49,8 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .smartAudioAltSoftSerialMethod = SETTING_VTX_SMARTAUDIO_ALTERNATE_SOFTSERIAL_METHOD_DEFAULT,
       .softSerialShortStop = SETTING_VTX_SOFTSERIAL_SHORTSTOP_DEFAULT,
       .smartAudioStopBits = SETTING_VTX_SMARTAUDIO_STOPBITS_DEFAULT,
+      .vtx3g3PowerMode = SETTING_VTX_3G3_POWER_MODE_DEFAULT,
+      .vtx3g3ClearPitmode = SETTING_VTX_3G3_CLEAR_PITMODE_DEFAULT,
 );
 
 static uint8_t locked = 0;

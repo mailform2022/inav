@@ -890,6 +890,18 @@ static bool vtxSAIsReady(const vtxDevice_t *vtxDevice)
     return vtxDevice != NULL && saDevice.version != SA_UNKNOWN;
 }
 
+// 3G3: clear pit mode so the VTX actually transmits. Only act when the device
+// reports it is currently in pit mode, to avoid sending redundant mode commands
+// on every band/channel/power change. SET_CHANNEL itself takes the device out of
+// user-frequency mode, so this is the only extra command needed to recover a VTX
+// that was left silent on a manual band/frequency before SmartAudio took over.
+static void sa3G3ApplyForceTx(void)
+{
+    if (saDevice.mode & SA_MODE_GET_PITMODE) {
+        saSetMode(SA_MODE_CLR_PITMODE);
+    }
+}
+
 void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channel)
 {
     UNUSED(vtxDevice);
@@ -906,6 +918,9 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         // SET_CHANNEL instead of re-sending every cycle (which corrupts video).
         sa3G3Band = band;
         sa3G3Channel = channel;
+        if (vtxConfig()->vtx3g3ClearPitmode && saDevice.version >= SA_2_1) {
+            sa3G3ApplyForceTx();
+        }
     }
 
     saSetBandAndChannel(band - 1, channel - 1);
@@ -919,19 +934,63 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // FF3741 reports a bogus SmartAudio power table, so we cannot trust
-        // saPowerTable here. The device speaks SmartAudio V2.1, which accepts an
-        // absolute power in dBm (MSB set). Command the dBm that matches the real
-        // 3G3 grid level (25 mW / 2 W / 5 W => 14 / 33 / 37 dBm) so the top
-        // level actually drives 5 W. This is sent once per change (the getter
-        // reports the commanded index back, so the scheduler does not re-send
-        // every cycle), which keeps the video stable.
-        if (index >= 1 && index <= 3) {
-            buf[4] = sa3G3PowerDbm[index - 1] | 128; // dBm, MSB = "set power by dBm"
-            buf[5] = CRC8(buf, 5);
-            saQueueCmd(buf, 6);
-            sa3G3Power = index;
+        // FF3741 / SX33 power. How the value is encoded is selectable at runtime
+        // (CLI `vtx_3g3_power_mode`) because clones disagree on the encoding:
+        //   AUTO      - send the dBm the VTX itself advertises (saPowerTable),
+        //               highest level for the top index. This is what Betaflight
+        //               does for V2.1 (it never invents a dBm the device didn't
+        //               report). Falls back to the fixed grid dBm if the device
+        //               reported no usable table.
+        //   FIXED_DBM - send the fixed grid dBm 14/33/37 with the V2.1 MSB flag.
+        //   INDEX     - send the power level index with no flag (V2.0 style).
+        //   RAW_DBM   - send the fixed grid dBm without the V2.1 flag.
+        // Sent once per change (the getter reports the commanded index back, so
+        // the scheduler does not re-send every cycle), which keeps the video
+        // stable.
+        if (index < 1 || index > 3) {
+            return;
         }
+
+        // Optionally clear pit mode and force channel mode first, so a VTX that
+        // was left on a manual band/frequency (and went silent) starts emitting.
+        if (vtxConfig()->vtx3g3ClearPitmode && saDevice.version >= SA_2_1) {
+            sa3G3ApplyForceTx();
+        }
+
+        switch (vtxConfig()->vtx3g3PowerMode) {
+        case VTX_3G3_POWER_INDEX:
+            buf[4] = index - 1;                       // V2.0: power by level index
+            break;
+        case VTX_3G3_POWER_RAW_DBM:
+            buf[4] = sa3G3PowerDbm[index - 1];        // dBm, no MSB flag
+            break;
+        case VTX_3G3_POWER_FIXED_DBM:
+            buf[4] = sa3G3PowerDbm[index - 1] | 128;  // fixed grid dBm, V2.1 MSB
+            break;
+        case VTX_3G3_POWER_AUTO:
+        default: {
+            // Use the dBm the VTX advertised; map our 3 grid levels onto the
+            // device's reported levels (min / middle / max).
+            uint8_t dbi = sa3G3PowerDbm[index - 1];   // fallback to grid dBm
+            if (saPowerCount > 0) {
+                uint8_t devIdx;
+                if (index == 1) {
+                    devIdx = 0;                        // lowest
+                } else if (index >= 3) {
+                    devIdx = saPowerCount - 1;         // highest
+                } else {
+                    devIdx = (saPowerCount - 1) / 2;   // middle
+                }
+                dbi = saPowerTable[devIdx].dbi;
+            }
+            buf[4] = dbi | 128;                        // V2.1 MSB
+            break;
+        }
+        }
+
+        buf[5] = CRC8(buf, 5);
+        saQueueCmd(buf, 6);
+        sa3G3Power = index;
         return;
     }
 

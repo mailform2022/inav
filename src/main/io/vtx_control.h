@@ -28,6 +28,13 @@ typedef struct vtxChannelActivationCondition_s {
     channelRange_t range;
 } vtxChannelActivationCondition_t;
 
+typedef enum {
+    VTX_3G3_POWER_AUTO = 0,    // Use the dBm levels reported by the VTX (SmartAudio V2.1, like Betaflight)
+    VTX_3G3_POWER_FIXED_DBM,   // Send fixed grid dBm 14/33/37 with the V2.1 dBm flag (MSB)
+    VTX_3G3_POWER_INDEX,       // Send the power level index, no flag (SmartAudio V2.0 style)
+    VTX_3G3_POWER_RAW_DBM,     // Send fixed grid dBm 14/33/37 without the V2.1 flag
+} vtx3g3PowerMode_e;
+
 typedef struct vtxConfig_s {
     vtxChannelActivationCondition_t vtxChannelActivationConditions[MAX_CHANNEL_ACTIVATION_CONDITION_COUNT];
     uint8_t halfDuplex;
@@ -35,6 +42,8 @@ typedef struct vtxConfig_s {
     bool    smartAudioAltSoftSerialMethod;
     bool    softSerialShortStop;
     uint8_t smartAudioStopBits;
+    uint8_t vtx3g3PowerMode;
+    bool    vtx3g3ClearPitmode;
 } vtxConfig_t;
 
 PG_DECLARE(vtxConfig_t, vtxConfig);

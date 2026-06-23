@@ -69,6 +69,7 @@ bool cliMode = false;
 #include "drivers/usb_msc.h"
 #include "drivers/vtx_common.h"
 #include "io/vtx.h"
+#include "io/vtx_control.h"
 #include "io/vtx_string.h"
 #include "io/vtx_smartaudio.h"
 #include "drivers/light_ws2811strip.h"
@@ -3855,12 +3856,22 @@ static void cliStatus(char *cmdline)
 #if defined(USE_VTX_CONTROL) && defined(USE_VTX_SMARTAUDIO)
     // SmartAudio link diagnostics (helpful for 3.3 GHz / FF3741 verification).
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        cliPrintf("VTX SA: ver=%d mode=0x%x devChan=%d devFreq=%d",
-                saDevice.version, saDevice.mode, saDevice.channel, saDevice.freq);
+        cliPrintf("VTX SA: ver=%d mode=0x%x devChan=%d devFreq=%d pit=%d freqMode=%d pwrIdx=%d",
+                saDevice.version, saDevice.mode, saDevice.channel, saDevice.freq,
+                (saDevice.mode & SA_MODE_GET_PITMODE) ? 1 : 0,
+                (saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ) ? 1 : 0,
+                saDevice.power);
         cliPrintLinefeed();
-        cliPrintf("VTX 3G3: band=%d chan=%d pwr=%d gridFreq=%d",
+        cliPrintf("VTX SA pwrtable: count=%d [", saPowerCount);
+        for (int i = 0; i < saPowerCount; i++) {
+            cliPrintf("%s%ddBm/%dmW", (i ? "," : ""), saPowerTable[i].dbi, saPowerTable[i].mW);
+        }
+        cliPrintf("]");
+        cliPrintLinefeed();
+        cliPrintf("VTX 3G3: band=%d chan=%d pwr=%d gridFreq=%d powerMode=%d clrPit=%d",
                 sa3G3Band, sa3G3Channel, sa3G3Power,
-                vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel));
+                vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel),
+                vtxConfig()->vtx3g3PowerMode, vtxConfig()->vtx3g3ClearPitmode ? 1 : 0);
         cliPrintLinefeed();
     }
 #endif
