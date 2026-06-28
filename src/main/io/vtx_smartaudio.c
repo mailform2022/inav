@@ -120,6 +120,13 @@ smartAudioStat_t saStat = {
     .badcode = 0,
 };
 
+// Cumulative count of SmartAudio frames actually put on the wire. Unlike
+// saStat.pktsent (which is periodically reset for the link-quality heuristic)
+// this only ever increases, so reading `status` twice a few seconds apart shows
+// exactly whether the FC is still talking to the VTX. If it does not change, the
+// FC is silent and any remaining video glitch is not coming from SmartAudio.
+uint32_t sa3G3TxTotal = 0;
+
 // Fill table with standard values for SA 1.0 and 2.0
 saPowerTable_t saPowerTable[VTX_SMARTAUDIO_MAX_POWER_COUNT] = {
     {  25,   7 },
@@ -542,6 +549,7 @@ static void saSendFrame(uint8_t *buf, int len)
 
     sa_lastTransmissionMs = millis();
     saStat.pktsent++;
+    sa3G3TxTotal++;
 }
 
 /*
