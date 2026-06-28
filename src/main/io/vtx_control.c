@@ -41,7 +41,7 @@
 
 #if defined(USE_VTX_CONTROL)
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 5);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 6);
 
 PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .halfDuplex = SETTING_VTX_HALFDUPLEX_DEFAULT,

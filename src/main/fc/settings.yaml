@@ -3823,8 +3823,8 @@ groups:
         min: 1
         max: 2
       - name: vtx_3g3_power_mode
-        description: "How RF power is commanded on the 3.3GHz (FF3741/SX33) grid. AUTO: use the dBm levels the VTX itself reports (SmartAudio V2.1, like Betaflight). FIXED_DBM: send the fixed grid dBm 14/33/37 (25mW/2W/5W) with the V2.1 dBm flag. INDEX: send the power level index with no flag (SmartAudio V2.0 style). RAW_DBM: send the fixed grid dBm without the V2.1 flag."
-        default_value: "AUTO"
+        description: "How RF power is commanded on the 3.3GHz (FF3741/SX33) grid. FIXED_DBM (default): send the fixed grid dBm 14/33/37 (25mW/2W/5W) with the V2.1 dBm flag - the FF3741 advertises a bogus power table, so the reported levels cannot be trusted. AUTO: use the dBm levels the VTX itself reports (SmartAudio V2.1, like Betaflight). INDEX: send the power level index with no flag (SmartAudio V2.0 style). RAW_DBM: send the fixed grid dBm without the V2.1 flag."
+        default_value: "FIXED_DBM"
         field: vtx3g3PowerMode
         table: vtx_3g3_power_modes
         type: uint8_t
@@ -3880,7 +3880,7 @@ groups:
         table: vtx_frequency_groups
         min: 0
         max: 3
-        default_value: FREQUENCYGROUP_5G8
+        default_value: FREQUENCYGROUP_3G3
 
   - name: PG_PINIOBOX_CONFIG
     type: pinioBoxConfig_t
