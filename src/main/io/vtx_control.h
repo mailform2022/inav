@@ -44,6 +44,7 @@ typedef struct vtxConfig_s {
     uint8_t smartAudioStopBits;
     uint8_t vtx3g3PowerMode;
     bool    vtx3g3ClearPitmode;
+    bool    vtx3g3Keepalive;
 } vtxConfig_t;
 
 PG_DECLARE(vtxConfig_t, vtxConfig);

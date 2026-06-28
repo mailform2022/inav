@@ -3868,10 +3868,11 @@ static void cliStatus(char *cmdline)
         }
         cliPrintf("]");
         cliPrintLinefeed();
-        cliPrintf("VTX 3G3: band=%d chan=%d pwr=%d gridFreq=%d powerMode=%d clrPit=%d",
+        cliPrintf("VTX 3G3: band=%d chan=%d pwr=%d gridFreq=%d powerMode=%d clrPit=%d keepalive=%d",
                 sa3G3Band, sa3G3Channel, sa3G3Power,
                 vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel),
-                vtxConfig()->vtx3g3PowerMode, vtxConfig()->vtx3g3ClearPitmode ? 1 : 0);
+                vtxConfig()->vtx3g3PowerMode, vtxConfig()->vtx3g3ClearPitmode ? 1 : 0,
+                vtxConfig()->vtx3g3Keepalive ? 1 : 0);
         cliPrintLinefeed();
     }
 #endif

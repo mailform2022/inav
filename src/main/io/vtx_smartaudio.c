@@ -826,14 +826,18 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
     saSendQueue();
     }
 
-    // 3.3 GHz grid (FF3741): do NOT periodically re-send band/channel/power.
-    // The scheduler now applies each setting once (it reads back the commanded
-    // value, see vtxSAGetBandAndChannel/vtxSAGetPowerIndex), so the only thing
-    // left to do here is (a) a slow read-only liveness poll and (b) a reconnect
-    // watchdog that forces a single re-apply after the VTX is power-cycled.
-    // GET_SETTINGS is a query and does not retune the RF, so it does not disturb
-    // the video the way a periodic SET_* would.
-    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && saDevice.version != SA_UNKNOWN) {
+    // 3.3 GHz grid (FF3741): settings are applied once by the common scheduler
+    // (it reads back the commanded value, see vtxSAGetBandAndChannel /
+    // vtxSAGetPowerIndex), so nothing has to be re-sent periodically. By default
+    // (vtx3g3Keepalive OFF) the FC then stays completely silent: the FF3741
+    // glitches the video (bars/jumps) on ANY SmartAudio traffic, including the
+    // read-only GET_SETTINGS poll, and the reconnect watchdog can re-fire
+    // SET_CHANNEL/SET_POWER on a momentary link blip and retune the RF. Silence
+    // gives a stable picture. The trade-off: power-cycling only the VTX needs an
+    // FC reboot to re-apply. Enable keepalive to restore the liveness poll and
+    // the single re-apply-on-reconnect behaviour.
+    if (vtxConfig()->vtx3g3Keepalive &&
+        vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && saDevice.version != SA_UNKNOWN) {
         static timeMs_t lastPollMs = 0;
         static uint16_t lastRcvd = 0;
         static timeMs_t lastRcvChangeMs = 0;

@@ -3833,6 +3833,11 @@ groups:
         default_value: ON
         field: vtx3g3ClearPitmode
         type: bool
+      - name: vtx_3g3_keepalive
+        description: "On the 3.3GHz (FF3741) grid, keep polling the VTX (liveness poll) and re-apply band/channel/power once after a reconnect. OFF (default) makes the FC apply settings once and then stay completely silent, which keeps the video stable (the FF3741 glitches the image on any SmartAudio traffic). With OFF, power-cycling only the VTX requires a FC reboot to re-apply settings."
+        default_value: OFF
+        field: vtx3g3Keepalive
+        type: bool
 
   - name: PG_VTX_SETTINGS_CONFIG
     type: vtxSettingsConfig_t
