@@ -46,6 +46,13 @@
 #define VTX_PKT_SIZE                16
 #define VTX_PROTO_STATE_TIMEOUT_MS  1000
 #define VTX_STATUS_INTERVAL_MS      2000
+// Some IRC Tramp clones (notably the 3.3 GHz SX33) lock their panel buttons the
+// moment they receive the first capabilities query, but will only complete the
+// handshake (and accept commands) once they have finished their own power-up. If
+// the query arrives too early they stay locked and never respond, which depends
+// on board timing (e.g. the magnetometer driver shifting task scheduling). Wait
+// for the device to boot before the first query so detection is deterministic.
+#define VTX_PROTO_BOOT_SETTLE_MS    1000
 
 #define VTX_UPDATE_REQ_NONE         0x00
 #define VTX_UPDATE_REQ_FREQUENCY    0x01
@@ -299,6 +306,12 @@ static void impl_Process(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
 
         // Send request for capabilities
         case VTX_STATE_OFFILE:
+            // Let the VTX finish its own power-up before the first query, so a
+            // slow-booting clone (SX33) is not left with locked panel buttons
+            // and an incomplete handshake.
+            if ((millis() - vtxState.lastStateChangeMs) < VTX_PROTO_BOOT_SETTLE_MS) {
+                break;
+            }
             vtxProtoQueryCapabilities();
             vtxProtoSetState(VTX_STATE_DETECTING);
             break;
@@ -311,10 +324,10 @@ static void impl_Process(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
                     vtxState.protoTimeoutCount = 0;
                     vtxProtoSetState(VTX_STATE_QUERY_STATUS);
                 }
-                else {
-                    // Unexpected response. Re-initialize
-                    vtxProtoSetState(VTX_STATE_RESET);
-                }
+                // Otherwise ignore the stray/echo packet and keep waiting for a
+                // capabilities reply until the timeout. Resetting on every
+                // unexpected byte re-sends the query (re-locking the panel) and
+                // can prevent a timing-sensitive clone from ever being detected.
             }
             else if (vtxProtoTimeout()) {
                 // Time-out while waiting for capabilities. Reset the state
