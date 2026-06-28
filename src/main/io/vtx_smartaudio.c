@@ -930,6 +930,16 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         // SET_CHANNEL instead of re-sending every cycle (which corrupts video).
         sa3G3Band = band;
         sa3G3Channel = channel;
+
+        // Hands-off option: do not command the channel at all. The recorded
+        // sa3G3Band/Channel above already make the scheduler converge (the getter
+        // reports them back), so nothing is sent and the VTX keeps the channel
+        // selected on its own buttons. Used to isolate whether SET_CHANNEL is
+        // what disturbs the FF3741 video.
+        if (!vtxConfig()->vtx3g3SetChannel) {
+            return;
+        }
+
         if (vtxConfig()->vtx3g3ClearPitmode && saDevice.version >= SA_2_1) {
             sa3G3ApplyForceTx();
         }
@@ -960,6 +970,16 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         // the scheduler does not re-send every cycle), which keeps the video
         // stable.
         if (index < 1 || index > 3) {
+            return;
+        }
+
+        // Hands-off option: never command power. Record the index so the
+        // scheduler converges (the getter reports it back) but send nothing, so
+        // the VTX keeps the power level set on its own buttons. Used to isolate
+        // whether the dBm power command is what makes the FF3741 power loop hunt
+        // (flicker / harmonics on the video).
+        if (vtxConfig()->vtx3g3PowerMode == VTX_3G3_POWER_NONE) {
+            sa3G3Power = index;
             return;
         }
 

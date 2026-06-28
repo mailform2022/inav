@@ -33,6 +33,7 @@ typedef enum {
     VTX_3G3_POWER_FIXED_DBM,   // Send fixed grid dBm 14/33/37 with the V2.1 dBm flag (MSB)
     VTX_3G3_POWER_INDEX,       // Send the power level index, no flag (SmartAudio V2.0 style)
     VTX_3G3_POWER_RAW_DBM,     // Send fixed grid dBm 14/33/37 without the V2.1 flag
+    VTX_3G3_POWER_NONE,        // Never command power; leave whatever the VTX/buttons set
 } vtx3g3PowerMode_e;
 
 typedef struct vtxConfig_s {
@@ -45,6 +46,7 @@ typedef struct vtxConfig_s {
     uint8_t vtx3g3PowerMode;
     bool    vtx3g3ClearPitmode;
     bool    vtx3g3Keepalive;
+    bool    vtx3g3SetChannel;
 } vtxConfig_t;
 
 PG_DECLARE(vtxConfig_t, vtxConfig);

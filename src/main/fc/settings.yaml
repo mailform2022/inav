@@ -122,7 +122,7 @@ tables:
     values: ["FREQUENCYGROUP_5G8", "FREQUENCYGROUP_2G4", "FREQUENCYGROUP_1G3", "FREQUENCYGROUP_3G3"]
     enum: vtxFrequencyGroups_e
   - name: vtx_3g3_power_modes
-    values: ["AUTO", "FIXED_DBM", "INDEX", "RAW_DBM"]
+    values: ["AUTO", "FIXED_DBM", "INDEX", "RAW_DBM", "NONE"]
     enum: vtx3g3PowerMode_e
   - name: filter_type
     values: ["PT1", "BIQUAD"]
@@ -3837,6 +3837,11 @@ groups:
         description: "On the 3.3GHz (FF3741) grid, keep polling the VTX (liveness poll) and re-apply band/channel/power once after a reconnect. OFF (default) makes the FC apply settings once and then stay completely silent, which keeps the video stable (the FF3741 glitches the image on any SmartAudio traffic). With OFF, power-cycling only the VTX requires a FC reboot to re-apply settings."
         default_value: OFF
         field: vtx3g3Keepalive
+        type: bool
+      - name: vtx_3g3_set_channel
+        description: "On the 3.3GHz (FF3741) grid, let the FC command the band/channel over SmartAudio. ON (default): the FC sets the channel. OFF: the FC never sends SET_CHANNEL, leaving whatever the VTX/buttons selected. Use OFF together with vtx_3g3_power_mode=NONE to make the FC fully hands-off (pure on-board-button control) for isolating which command disturbs the video."
+        default_value: ON
+        field: vtx3g3SetChannel
         type: bool
 
   - name: PG_VTX_SETTINGS_CONFIG
