@@ -931,17 +931,32 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         sa3G3Band = band;
         sa3G3Channel = channel;
 
-        // Hands-off option: do not command the channel at all. The recorded
-        // sa3G3Band/Channel above already make the scheduler converge (the getter
-        // reports them back), so nothing is sent and the VTX keeps the channel
-        // selected on its own buttons. Used to isolate whether SET_CHANNEL is
-        // what disturbs the FF3741 video.
-        if (!vtxConfig()->vtx3g3SetChannel) {
-            return;
-        }
-
+        // The recorded sa3G3Band/Channel above already make the scheduler
+        // converge (the getter reports them back), so at most one command is
+        // sent per change regardless of the mode below.
         if (vtxConfig()->vtx3g3ClearPitmode && saDevice.version >= SA_2_1) {
             sa3G3ApplyForceTx();
+        }
+
+        switch (vtxConfig()->vtx3g3ChannelMode) {
+        case VTX_3G3_CHAN_NONE:
+            // Do not command the channel; leave what the buttons selected.
+            return;
+        case VTX_3G3_CHAN_FREQUENCY: {
+            // Command the actual grid frequency. Many 3.3GHz clones (FF3741 /
+            // SX33) mis-map the SmartAudio channel index and land on a garbage
+            // frequency (video stripes); SET_FREQ with the real MHz tunes them
+            // cleanly. SA_FREQ_* flags are the top two bits, and every 3.3GHz
+            // grid frequency is well under 0x4000, so a plain MHz value is safe.
+            uint16_t freq = vtx3G3_Bandchan2Freq(band, channel);
+            if (freq) {
+                saSetFreq(freq);
+            }
+            return;
+        }
+        case VTX_3G3_CHAN_CHANNEL:
+        default:
+            break;
         }
     }
 

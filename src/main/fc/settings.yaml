@@ -124,6 +124,9 @@ tables:
   - name: vtx_3g3_power_modes
     values: ["AUTO", "FIXED_DBM", "INDEX", "RAW_DBM", "NONE"]
     enum: vtx3g3PowerMode_e
+  - name: vtx_3g3_channel_modes
+    values: ["CHANNEL", "FREQUENCY", "NONE"]
+    enum: vtx3g3ChannelMode_e
   - name: filter_type
     values: ["PT1", "BIQUAD"]
   - name: filter_type_full
@@ -3838,11 +3841,12 @@ groups:
         default_value: OFF
         field: vtx3g3Keepalive
         type: bool
-      - name: vtx_3g3_set_channel
-        description: "On the 3.3GHz (FF3741) grid, let the FC command the band/channel over SmartAudio. ON (default): the FC sets the channel. OFF: the FC never sends SET_CHANNEL, leaving whatever the VTX/buttons selected. Use OFF together with vtx_3g3_power_mode=NONE to make the FC fully hands-off (pure on-board-button control) for isolating which command disturbs the video."
-        default_value: ON
-        field: vtx3g3SetChannel
-        type: bool
+      - name: vtx_3g3_channel_mode
+        description: "How the FC commands the band/channel on the 3.3GHz (FF3741/SX33) grid. CHANNEL: SmartAudio SET_CHANNEL by index - many 3.3GHz clones mis-map this and land on a garbage frequency (video stripes). FREQUENCY (default): SET_FREQ with the actual grid MHz, which these clones tune cleanly. NONE: never command the channel, leaving whatever the on-board buttons selected."
+        default_value: "FREQUENCY"
+        field: vtx3g3ChannelMode
+        table: vtx_3g3_channel_modes
+        type: uint8_t
 
   - name: PG_VTX_SETTINGS_CONFIG
     type: vtxSettingsConfig_t

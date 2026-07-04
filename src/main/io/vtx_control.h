@@ -36,6 +36,12 @@ typedef enum {
     VTX_3G3_POWER_NONE,        // Never command power; leave whatever the VTX/buttons set
 } vtx3g3PowerMode_e;
 
+typedef enum {
+    VTX_3G3_CHAN_CHANNEL = 0,  // Command band/channel with SET_CHANNEL (index)
+    VTX_3G3_CHAN_FREQUENCY,    // Command the actual grid frequency with SET_FREQ (MHz)
+    VTX_3G3_CHAN_NONE,         // Never command band/channel; leave what the buttons set
+} vtx3g3ChannelMode_e;
+
 typedef struct vtxConfig_s {
     vtxChannelActivationCondition_t vtxChannelActivationConditions[MAX_CHANNEL_ACTIVATION_CONDITION_COUNT];
     uint8_t halfDuplex;
@@ -46,7 +52,7 @@ typedef struct vtxConfig_s {
     uint8_t vtx3g3PowerMode;
     bool    vtx3g3ClearPitmode;
     bool    vtx3g3Keepalive;
-    bool    vtx3g3SetChannel;
+    uint8_t vtx3g3ChannelMode;
 } vtxConfig_t;
 
 PG_DECLARE(vtxConfig_t, vtxConfig);
