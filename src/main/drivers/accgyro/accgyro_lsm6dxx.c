@@ -293,7 +293,13 @@ bool lsm6dGyroDetect(gyroDev_t *gyro)
     gyro->readFn = lsm6dxxGyroRead;
     gyro->intStatusFn = gyroCheckDataReady;
     gyro->scale = (lsm6dID == LSM6DSV16X_CHIP_ID) ? 0.070f : (1.0f / 16.4f);
-    gyro->gyroAlign = gyro->busDev->param;
+    // Classic LSM6DSL/DSO/DS3 never copied the bus alignment onto the gyro here
+    // (only the accel did). Boards were tuned against that behaviour, so keep it
+    // to avoid a silent gyro-orientation change on upgrade. The newer LSM6DSV
+    // path, added later, always relied on this alignment, so keep it there.
+    if (lsm6dID == LSM6DSV16X_CHIP_ID) {
+        gyro->gyroAlign = gyro->busDev->param;
+    }
     return true;
 
 }

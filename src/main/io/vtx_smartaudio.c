@@ -173,6 +173,10 @@ uint8_t sa3G3Band = 0;
 uint8_t sa3G3Channel = 0;
 uint8_t sa3G3Power = 0;
 
+// Last SET_CHANNEL frame actually put on the wire, for `status` diagnostics.
+uint8_t sa3G3LastChanBuf[8] = { 0 };
+uint8_t sa3G3LastChanLen = 0;
+
 // 3G3 grid power levels are 25 mW / 2 W / 5 W (see vtx3G3DefaultPowerNames).
 // The FF3741 advertises a bogus SmartAudio power table, so we ignore the
 // device table and command power by absolute dBm (V2.1) computed from these
@@ -914,6 +918,58 @@ static void sa3G3ApplyForceTx(void)
     }
 }
 
+// 3G3 SET_CHANNEL sender with experimental knobs. Some 3.3 GHz clones (FF3741)
+// stripe the video on the frequency->channel mode transition that a normal
+// SET_CHANNEL triggers. The knobs below let the user find a clean sequence on
+// the bench without new firmware each time:
+//   vtx_3g3_chan_setmode       - send SET_MODE (unlock + clr-pit) just before
+//   vtx_3g3_chan_interbyte_ms  - gap between the frame bytes on the wire
+//   vtx_3g3_chan_settle_ms     - pause after the frame
+// band/channel here are 1-based (as passed by the VTX API).
+static void sa3G3SendChannel(uint8_t band, uint8_t channel)
+{
+    // Build the exact frame so we can log what actually goes on the wire.
+    uint8_t buf[6] = { 0xAA, 0x55, SACMD(SA_CMD_SET_CHAN), 1 };
+    buf[4] = SA_BANDCHAN_TO_DEVICE_CHVAL(band - 1, channel - 1);
+    buf[5] = CRC8(buf, 5);
+    memcpy(sa3G3LastChanBuf, buf, sizeof(buf));
+    sa3G3LastChanLen = sizeof(buf);
+
+    if (vtxConfig()->vtx3g3ChanSetMode) {
+        // Unlock + clear pit right before the channel switch. Queued normally.
+        saSetMode(SA_MODE_CLR_PITMODE);
+    }
+
+    const uint8_t interByteMs = vtxConfig()->vtx3g3ChanInterByteMs;
+    if (interByteMs == 0) {
+        // Normal path: queue it like a stock SmartAudio VTX.
+        saSetBandAndChannel(band - 1, channel - 1);
+        return;
+    }
+
+    // Experimental path: emit the frame directly with an inter-byte gap. This
+    // blocks the caller (bench use); on 3G3 the FC is otherwise silent so this
+    // does not fight the command queue.
+    if (smartAudioSerialPort == NULL) {
+        return;
+    }
+    serialWrite(smartAudioSerialPort, 0x00); // pull the line low first (TBS SA)
+    while (!isSerialTransmitBufferEmpty(smartAudioSerialPort)) { /* drain */ }
+    delay(interByteMs);
+    for (unsigned i = 0; i < sizeof(buf); i++) {
+        serialWrite(smartAudioSerialPort, buf[i]);
+        while (!isSerialTransmitBufferEmpty(smartAudioSerialPort)) { /* drain */ }
+        delay(interByteMs);
+    }
+    sa_lastTransmissionMs = millis();
+    saStat.pktsent++;
+    sa3G3TxTotal++;
+
+    if (vtxConfig()->vtx3g3ChanSettleMs) {
+        delay(vtxConfig()->vtx3g3ChanSettleMs);
+    }
+}
+
 void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channel)
 {
     UNUSED(vtxDevice);
@@ -956,7 +1012,10 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         }
         case VTX_3G3_CHAN_CHANNEL:
         default:
-            break;
+            // SET_CHANNEL by index, like Betaflight, with optional experimental
+            // timing/mode workarounds for clones that stripe on the switch.
+            sa3G3SendChannel(band, channel);
+            return;
         }
     }
 

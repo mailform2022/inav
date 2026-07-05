@@ -3842,10 +3842,29 @@ groups:
         field: vtx3g3Keepalive
         type: bool
       - name: vtx_3g3_channel_mode
-        description: "How the FC commands the band/channel on the 3.3GHz (FF3741/SX33) grid. CHANNEL: SmartAudio SET_CHANNEL by index - many 3.3GHz clones mis-map this and land on a garbage frequency (video stripes). FREQUENCY (default): SET_FREQ with the actual grid MHz, which these clones tune cleanly. NONE: never command the channel, leaving whatever the on-board buttons selected."
-        default_value: "FREQUENCY"
+        description: "How the FC commands the band/channel on the 3.3GHz (FF3741/SX33) grid. CHANNEL (default): SmartAudio SET_CHANNEL by index, like Betaflight - use the experimental vtx_3g3_chan_* knobs below if this clone stripes the video on the switch. FREQUENCY: SET_FREQ with the actual grid MHz (FF3741 accepts it but may not actually retune). NONE: never command the channel, leaving whatever the on-board buttons selected."
+        default_value: "CHANNEL"
         field: vtx3g3ChannelMode
         table: vtx_3g3_channel_modes
+        type: uint8_t
+      - name: vtx_3g3_chan_setmode
+        description: "Experimental (3.3GHz CHANNEL mode): send a SmartAudio SET_MODE (unlock + clear pit) immediately before SET_CHANNEL. Some 3.3GHz clones (FF3741) glitch the video on the freq->channel transition; a preceding mode command can make the switch clean. OFF by default."
+        default_value: OFF
+        field: vtx3g3ChanSetMode
+        type: bool
+      - name: vtx_3g3_chan_interbyte_ms
+        description: "Experimental (3.3GHz CHANNEL mode): insert this many milliseconds of gap between the bytes of the SET_CHANNEL frame on the wire. Some SmartAudio clones are sensitive to inter-byte timing. 0 (default) sends the frame normally through the queue; any non-zero value sends it directly with the requested spacing (blocking, bench use)."
+        default_value: 0
+        field: vtx3g3ChanInterByteMs
+        min: 0
+        max: 50
+        type: uint8_t
+      - name: vtx_3g3_chan_settle_ms
+        description: "Experimental (3.3GHz CHANNEL mode): pause this many milliseconds after sending the SET_CHANNEL frame (only used when vtx_3g3_chan_interbyte_ms is non-zero). Lets a slow clone settle before any further traffic. 0 by default."
+        default_value: 0
+        field: vtx3g3ChanSettleMs
+        min: 0
+        max: 200
         type: uint8_t
 
   - name: PG_VTX_SETTINGS_CONFIG

@@ -41,7 +41,7 @@
 
 #if defined(USE_VTX_CONTROL)
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 9);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 10);
 
 PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .halfDuplex = SETTING_VTX_HALFDUPLEX_DEFAULT,
@@ -53,6 +53,9 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .vtx3g3ClearPitmode = SETTING_VTX_3G3_CLEAR_PITMODE_DEFAULT,
       .vtx3g3Keepalive = SETTING_VTX_3G3_KEEPALIVE_DEFAULT,
       .vtx3g3ChannelMode = SETTING_VTX_3G3_CHANNEL_MODE_DEFAULT,
+      .vtx3g3ChanSetMode = SETTING_VTX_3G3_CHAN_SETMODE_DEFAULT,
+      .vtx3g3ChanInterByteMs = SETTING_VTX_3G3_CHAN_INTERBYTE_MS_DEFAULT,
+      .vtx3g3ChanSettleMs = SETTING_VTX_3G3_CHAN_SETTLE_MS_DEFAULT,
 );
 
 static uint8_t locked = 0;

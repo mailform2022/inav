@@ -3875,6 +3875,14 @@ static void cliStatus(char *cmdline)
                 vtxConfig()->vtx3g3Keepalive ? 1 : 0, vtxConfig()->vtx3g3ChannelMode,
                 (unsigned long)sa3G3TxTotal);
         cliPrintLinefeed();
+        cliPrintf("VTX 3G3 chan: setMode=%d interByteMs=%d settleMs=%d lastTx=[",
+                vtxConfig()->vtx3g3ChanSetMode ? 1 : 0,
+                vtxConfig()->vtx3g3ChanInterByteMs, vtxConfig()->vtx3g3ChanSettleMs);
+        for (int i = 0; i < sa3G3LastChanLen; i++) {
+            cliPrintf("%s%02X", (i ? " " : ""), sa3G3LastChanBuf[i]);
+        }
+        cliPrintf("]");
+        cliPrintLinefeed();
     }
 #endif
 #endif

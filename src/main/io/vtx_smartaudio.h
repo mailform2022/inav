@@ -102,6 +102,8 @@ extern uint8_t sa3G3Band;
 extern uint8_t sa3G3Channel;
 extern uint8_t sa3G3Power;
 extern uint32_t sa3G3TxTotal;
+extern uint8_t sa3G3LastChanBuf[8];
+extern uint8_t sa3G3LastChanLen;
 extern const char * saPowerNames[VTX_SMARTAUDIO_MAX_POWER_COUNT + 1];
 extern smartAudioStat_t saStat;
 

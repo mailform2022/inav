@@ -53,6 +53,9 @@ typedef struct vtxConfig_s {
     bool    vtx3g3ClearPitmode;
     bool    vtx3g3Keepalive;
     uint8_t vtx3g3ChannelMode;
+    bool    vtx3g3ChanSetMode;       // send SET_MODE (unlock/clr-pit) before SET_CHANNEL
+    uint8_t vtx3g3ChanInterByteMs;   // gap between SET_CHANNEL frame bytes on the wire
+    uint8_t vtx3g3ChanSettleMs;      // pause after the SET_CHANNEL frame
 } vtxConfig_t;
 
 PG_DECLARE(vtxConfig_t, vtxConfig);
