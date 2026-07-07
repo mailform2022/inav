@@ -53,6 +53,12 @@ typedef enum portOptions_t {
 
     SERIAL_LONGSTOP      = 0 << 6,
     SERIAL_SHORTSTOP     = 1 << 6,
+
+    // Force a pull-DOWN on a BIDIR push-pull line so it rests LOW (SPACE) while
+    // idle instead of floating. Matches Betaflight's SERIAL_PULL_SMARTAUDIO:
+    // some SmartAudio clones (e.g. FF3741) couple noise from a floating single
+    // wire into the analog video (stripes). Only honoured on the BIDIR_PP path.
+    SERIAL_PULLDOWN      = 1 << 7,
 } portOptions_t;
 
 typedef void (*serialReceiveCallbackPtr)(uint16_t data, void *rxCallbackData);   // used by serial drivers to return frames to app

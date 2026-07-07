@@ -3866,6 +3866,32 @@ groups:
         min: 0
         max: 200
         type: uint8_t
+      - name: vtx_3g3_sa_pulldown
+        description: "3.3GHz SmartAudio (FF3741): pull the half-duplex SmartAudio line LOW while idle instead of letting it float, matching Betaflight's SmartAudio pull-down. A floating single-wire line couples noise into the analog video and can produce stripes/bars on the FF3741. ON by default; only affects the SmartAudio port while the 3.3GHz frequency group is selected. Takes effect after a reboot."
+        default_value: ON
+        field: vtx3g3SaPulldown
+        type: bool
+      - name: vtx_3g3_tramp_pwr1
+        description: "IRC Tramp 3.3GHz (SX33) device power code for the lowest grid level (25mW). The SX33 uses its own scale codes rather than real mW; adjust only if a particular unit does not reach the expected output. Default 25."
+        default_value: 25
+        field: vtx3g3TrampPwrCode[0]
+        min: 0
+        max: 5000
+        type: uint16_t
+      - name: vtx_3g3_tramp_pwr2
+        description: "IRC Tramp 3.3GHz (SX33) device power code for the middle grid level (200mW). Default 100."
+        default_value: 100
+        field: vtx3g3TrampPwrCode[1]
+        min: 0
+        max: 5000
+        type: uint16_t
+      - name: vtx_3g3_tramp_pwr3
+        description: "IRC Tramp 3.3GHz (SX33) device power code for the highest grid level (5W). Some SX33 units do not reach full output with the default code; raise/adjust this until the detector shows maximum power. Default 600."
+        default_value: 600
+        field: vtx3g3TrampPwrCode[2]
+        min: 0
+        max: 5000
+        type: uint16_t
 
   - name: PG_VTX_SETTINGS_CONFIG
     type: vtxSettingsConfig_t

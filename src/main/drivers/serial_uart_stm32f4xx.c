@@ -293,7 +293,10 @@ uartPort_t *serialUART(UARTDevice_e device, uint32_t baudRate, portMode_t mode, 
     if (options & SERIAL_BIDIR) {
         IOInit(tx, OWNER_SERIAL, RESOURCE_UART_TXRX, RESOURCE_INDEX(device));
         if (options & SERIAL_BIDIR_PP) {
-            IOConfigGPIOAF(tx, IOCFG_AF_PP, uart->af);
+            // SERIAL_PULLDOWN keeps a floating single-wire line resting LOW while
+            // idle (matches Betaflight's SmartAudio pull-down for clones that
+            // otherwise stripe the analog video).
+            IOConfigGPIOAF(tx, (options & SERIAL_PULLDOWN) ? IOCFG_AF_PP_PD : IOCFG_AF_PP, uart->af);
         } else {
             IOConfigGPIOAF(tx,
                     (options & SERIAL_BIDIR_NOPULL) ? IOCFG_AF_OD : IOCFG_AF_OD_UP,

@@ -477,8 +477,9 @@ static void impl_SetPowerByIndex(vtxDevice_t * vtxDevice, uint8_t index)
     // reports 0 for the lowest, but a 0 set-command means pit/off). Map 3G3
     // power to those device codes; all other groups send mW unchanged.
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        static const uint16_t tramp3G3DevicePower[VTX_TRAMP_3G3_MAX_POWER_COUNT] = { 25, 100, 600 };
-        vtxState.request.devicePower = tramp3G3DevicePower[index - 1];
+        // Device-scale codes are CLI-tunable (vtx_3g3_tramp_pwr1/2/3) because
+        // some SX33 units do not reach true max output with the default code.
+        vtxState.request.devicePower = vtxConfig()->vtx3g3TrampPwrCode[index - 1];
     } else {
         vtxState.request.devicePower = vtxState.request.power;
     }

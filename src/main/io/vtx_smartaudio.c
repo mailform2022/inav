@@ -737,6 +737,13 @@ bool vtxSmartAudioInit(void)
     if (portConfig) {
         portOptions_t portOptions = (vtxConfig()->smartAudioStopBits == 2 ? SERIAL_STOPBITS_2 : SERIAL_STOPBITS_1) | SERIAL_BIDIR_NOPULL;
         portOptions = portOptions | (vtxConfig()->halfDuplex ? SERIAL_BIDIR | SERIAL_BIDIR_PP : SERIAL_UNIDIR);
+        // 3.3 GHz clones (FF3741) stripe the analog video because the half-duplex
+        // SmartAudio line floats between frames. Betaflight pulls the line DOWN
+        // (SERIAL_PULL_SMARTAUDIO); mirror that here so the wire rests LOW. Only
+        // for the 3G3 grid so existing 5.8 GHz setups are untouched.
+        if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && vtxConfig()->vtx3g3SaPulldown) {
+            portOptions |= SERIAL_PULLDOWN;
+        }
         smartAudioSerialPort = openSerialPort(portConfig->identifier, FUNCTION_VTX_SMARTAUDIO, NULL, NULL, 4800, MODE_RXTX, portOptions);
     }
 

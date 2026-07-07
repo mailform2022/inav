@@ -56,6 +56,8 @@ typedef struct vtxConfig_s {
     bool    vtx3g3ChanSetMode;       // send SET_MODE (unlock/clr-pit) before SET_CHANNEL
     uint8_t vtx3g3ChanInterByteMs;   // gap between SET_CHANNEL frame bytes on the wire
     uint8_t vtx3g3ChanSettleMs;      // pause after the SET_CHANNEL frame
+    bool    vtx3g3SaPulldown;        // pull the SmartAudio line LOW while idle (FF3741 video stripes)
+    uint16_t vtx3g3TrampPwrCode[3];  // IRC Tramp (SX33) 3.3GHz device power codes per grid level
 } vtxConfig_t;
 
 PG_DECLARE(vtxConfig_t, vtxConfig);
