@@ -6092,6 +6092,116 @@ Warning voltage per cell, this triggers battery-warning alarms, in 0.01V units, 
 
 ---
 
+### vtx_3g3_chan_interbyte_ms
+
+Experimental (3.3GHz CHANNEL mode): insert this many milliseconds of gap between the bytes of the SET_CHANNEL frame on the wire. Some SmartAudio clones are sensitive to inter-byte timing. 0 (default) sends the frame normally through the queue; any non-zero value sends it directly with the requested spacing (blocking, bench use).
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 50 |
+
+---
+
+### vtx_3g3_chan_setmode
+
+Experimental (3.3GHz CHANNEL mode): send a SmartAudio SET_MODE (unlock + clear pit) immediately before SET_CHANNEL. Some 3.3GHz clones (FF3741) glitch the video on the freq->channel transition; a preceding mode command can make the switch clean. OFF by default.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| OFF | OFF | ON |
+
+---
+
+### vtx_3g3_chan_settle_ms
+
+Experimental (3.3GHz CHANNEL mode): pause this many milliseconds after sending the SET_CHANNEL frame (only used when vtx_3g3_chan_interbyte_ms is non-zero). Lets a slow clone settle before any further traffic. 0 by default.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 200 |
+
+---
+
+### vtx_3g3_channel_mode
+
+How the FC commands the band/channel on the 3.3GHz (FF3741/SX33) grid. CHANNEL (default): SmartAudio SET_CHANNEL by index, like Betaflight - use the experimental vtx_3g3_chan_* knobs below if this clone stripes the video on the switch. FREQUENCY: SET_FREQ with the actual grid MHz (FF3741 accepts it but may not actually retune). NONE: never command the channel, leaving whatever the on-board buttons selected.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| CHANNEL |  |  |
+
+---
+
+### vtx_3g3_clear_pitmode
+
+On the 3.3GHz (FF3741) grid, clear pit mode and force channel mode when applying settings. Fixes the VTX going silent after it was left on a manual band/frequency before SmartAudio took over.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| ON | OFF | ON |
+
+---
+
+### vtx_3g3_keepalive
+
+On the 3.3GHz (FF3741) grid, keep polling the VTX (liveness poll) and re-apply band/channel/power once after a reconnect. OFF (default) makes the FC apply settings once and then stay completely silent, which keeps the video stable (the FF3741 glitches the image on any SmartAudio traffic). With OFF, power-cycling only the VTX requires a FC reboot to re-apply settings.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| OFF | OFF | ON |
+
+---
+
+### vtx_3g3_power_mode
+
+How RF power is commanded on the 3.3GHz (FF3741/SX33) grid. FIXED_DBM (default): send the fixed grid dBm 14/33/37 (25mW/2W/5W) with the V2.1 dBm flag - the FF3741 advertises a bogus power table, so the reported levels cannot be trusted. AUTO: use the dBm levels the VTX itself reports (SmartAudio V2.1, like Betaflight). INDEX: send the power level index with no flag (SmartAudio V2.0 style). RAW_DBM: send the fixed grid dBm without the V2.1 flag.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| FIXED_DBM |  |  |
+
+---
+
+### vtx_3g3_sa_pulldown
+
+3.3GHz SmartAudio (FF3741): pull the half-duplex SmartAudio line LOW while idle instead of letting it float, matching Betaflight's SmartAudio pull-down. A floating single-wire line couples noise into the analog video and can produce stripes/bars on the FF3741. ON by default; only affects the SmartAudio port while the 3.3GHz frequency group is selected. Takes effect after a reboot.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| ON | OFF | ON |
+
+---
+
+### vtx_3g3_tramp_pwr1
+
+IRC Tramp 3.3GHz (SX33) device power code for the lowest grid level (25mW). The SX33 uses its own scale codes rather than real mW; adjust only if a particular unit does not reach the expected output. Default 25.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 25 | 0 | 5000 |
+
+---
+
+### vtx_3g3_tramp_pwr2
+
+IRC Tramp 3.3GHz (SX33) device power code for the middle grid level (200mW). Default 100.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 100 | 0 | 5000 |
+
+---
+
+### vtx_3g3_tramp_pwr3
+
+IRC Tramp 3.3GHz (SX33) device power code for the highest grid level (5W). Some SX33 units do not reach full output with the default code; raise/adjust this until the detector shows maximum power. Default 600.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 600 | 0 | 5000 |
+
+---
+
 ### vtx_band
 
 Configure the VTX band. Bands: 1: A, 2: B, 3: E, 4: F, 5: Race.
@@ -6118,7 +6228,7 @@ VTx Frequency group to use. Frequency groups: FREQUENCYGROUP_5G8: 5.8GHz, FREQUE
 
 | Default | Min | Max |
 | --- | --- | --- |
-| FREQUENCYGROUP_5G8 | 0 | 3 |
+| FREQUENCYGROUP_3G3 | 0 | 3 |
 
 ---
 
