@@ -3893,8 +3893,8 @@ groups:
         max: 5000
         type: uint16_t
       - name: vtx_3g3_chan_freqfix
-        description: "Experimental (3.3GHz CHANNEL mode, FF3741): after the SET_CHANNEL frame, also send SET_FREQ with the real grid frequency (MHz) of the selected band/channel. Some clones retune the PLL on SET_CHANNEL but leave the internal frequency register garbage (devFreq=0x4000, freqMode stuck at 1), which stripes the video; writing a valid frequency afterwards can clear it. OFF by default; only used on the 3.3GHz group in CHANNEL mode."
-        default_value: OFF
+        description: "3.3GHz CHANNEL mode (FF3741): after the SET_CHANNEL frame, also send SET_FREQ with the real grid frequency (MHz) of the selected band/channel. Some clones retune the PLL on SET_CHANNEL but leave the internal frequency register garbage (devFreq=0x4000), which worsens the video; writing a valid frequency afterwards stabilises the register (verified: devFreq tracks the channel and picture jitter is reduced). ON by default; only used on the 3.3GHz group in CHANNEL mode."
+        default_value: ON
         field: vtx3g3ChanFreqFix
         type: bool
 
