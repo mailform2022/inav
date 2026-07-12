@@ -951,6 +951,16 @@ static void sa3G3SendChannel(uint8_t band, uint8_t channel)
     if (interByteMs == 0) {
         // Normal path: queue it like a stock SmartAudio VTX.
         saSetBandAndChannel(band - 1, channel - 1);
+        // Some clones (FF3741) retune the PLL on SET_CHANNEL but leave the
+        // internal frequency register garbage (devFreq=0x4000, freqMode stuck
+        // at 1), which stripes the video. Optionally write the real grid MHz
+        // right after so the register is valid.
+        if (vtxConfig()->vtx3g3ChanFreqFix) {
+            uint16_t freq = vtx3G3_Bandchan2Freq(band, channel);
+            if (freq) {
+                saSetFreq(freq);
+            }
+        }
         return;
     }
 
@@ -974,6 +984,14 @@ static void sa3G3SendChannel(uint8_t band, uint8_t channel)
 
     if (vtxConfig()->vtx3g3ChanSettleMs) {
         delay(vtxConfig()->vtx3g3ChanSettleMs);
+    }
+
+    // Same freq-register fix for the experimental direct path.
+    if (vtxConfig()->vtx3g3ChanFreqFix) {
+        uint16_t freq = vtx3G3_Bandchan2Freq(band, channel);
+        if (freq) {
+            saSetFreq(freq);
+        }
     }
 }
 

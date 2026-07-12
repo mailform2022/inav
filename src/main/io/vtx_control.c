@@ -41,7 +41,7 @@
 
 #if defined(USE_VTX_CONTROL)
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 11);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 12);
 
 PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .halfDuplex = SETTING_VTX_HALFDUPLEX_DEFAULT,
@@ -62,6 +62,7 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
           SETTING_VTX_3G3_TRAMP_PWR2_DEFAULT,
           SETTING_VTX_3G3_TRAMP_PWR3_DEFAULT,
       },
+      .vtx3g3ChanFreqFix = SETTING_VTX_3G3_CHAN_FREQFIX_DEFAULT,
 );
 
 static uint8_t locked = 0;

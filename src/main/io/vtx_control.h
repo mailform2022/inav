@@ -58,6 +58,7 @@ typedef struct vtxConfig_s {
     uint8_t vtx3g3ChanSettleMs;      // pause after the SET_CHANNEL frame
     bool    vtx3g3SaPulldown;        // pull the SmartAudio line LOW while idle (FF3741 video stripes)
     uint16_t vtx3g3TrampPwrCode[3];  // IRC Tramp (SX33) 3.3GHz device power codes per grid level
+    bool    vtx3g3ChanFreqFix;       // after SET_CHANNEL, also SET_FREQ the real grid MHz (FF3741 stuck freqMode)
 } vtxConfig_t;
 
 PG_DECLARE(vtxConfig_t, vtxConfig);
