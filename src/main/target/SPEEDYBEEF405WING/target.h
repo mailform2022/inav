@@ -196,7 +196,4 @@
 
 #define USE_PINIO
 #define USE_PINIOBOX
-// Duck (UTKA): USER1/PINIO1 = arming ("взвод") output on the S9 pad (PB10).
-// INAV7 has no runtime `resource PINIO` remap, so the pin is fixed here.
-#define PINIO1_PIN                  PB10    // S9 pad
-#define PINIO2_PIN                  PC13
+#define PINIO1_PIN                  PC13
