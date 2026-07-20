@@ -6092,6 +6092,16 @@ Warning voltage per cell, this triggers battery-warning alarms, in 0.01V units, 
 
 ---
 
+### vtx_3g3_chan_freqfix
+
+3.3GHz CHANNEL mode (FF3741): after the SET_CHANNEL frame, also send SET_FREQ with the real grid frequency (MHz) of the selected band/channel. Some clones retune the PLL on SET_CHANNEL but leave the internal frequency register garbage (devFreq=0x4000), which worsens the video; writing a valid frequency afterwards stabilises the register (verified: devFreq tracks the channel and picture jitter is reduced). ON by default; only used on the 3.3GHz group in CHANNEL mode.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| ON | OFF | ON |
+
+---
+
 ### vtx_3g3_chan_interbyte_ms
 
 Experimental (3.3GHz CHANNEL mode): insert this many milliseconds of gap between the bytes of the SET_CHANNEL frame on the wire. Some SmartAudio clones are sensitive to inter-byte timing. 0 (default) sends the frame normally through the queue; any non-zero value sends it directly with the requested spacing (blocking, bench use).
