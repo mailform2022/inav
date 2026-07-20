@@ -196,4 +196,5 @@
 
 #define USE_PINIO
 #define USE_PINIOBOX
-#define PINIO1_PIN                  PC13
+#define PINIO1_PIN                  PC13    // USER1 -> dual-camera video switch (C1/C2)
+#define PINIO2_PIN                  PB10    // USER2 -> S9 arming ("vzvod") high-level output

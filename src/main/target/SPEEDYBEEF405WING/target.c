@@ -32,7 +32,7 @@ timerHardware_t timerHardware[] = {
     
     DEF_TIM(TIM8,  CH2N, PB14, TIM_USE_OUTPUT_AUTO,   1, 0), // S7
     DEF_TIM(TIM2,   CH1, PA15, TIM_USE_OUTPUT_AUTO,   1, 0), // S8
-    DEF_TIM(TIM2,   CH3, PB10, TIM_USE_OUTPUT_AUTO,   1, 0), // S9
+    // S9 (PB10) is used as PINIO2 (arming high-level output), not as a PWM output
     DEF_TIM(TIM2,   CH4, PB11, TIM_USE_OUTPUT_AUTO,   1, 0), // S10
     DEF_TIM(TIM12,  CH2, PB15, TIM_USE_OUTPUT_AUTO,   1, 0), // S11 
 

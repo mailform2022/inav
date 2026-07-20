@@ -4846,6 +4846,37 @@ static bool osdIsPageDownStickCommandHeld(void)
     return false;
 }
 
+// Privacy curtain: fills the screen with a repeating IC-chip glyph to hide
+// telemetry from onlookers, leaving a central window clear so the operator can
+// still see flight direction (video + artificial horizon + crosshair).
+// Toggled by BOXUSER3 (mapped to CH6 in the Duck config).
+static void osdDrawPrivacyCurtain(void)
+{
+    const uint8_t cols = osdDisplayPort->cols;
+    const uint8_t rows = osdDisplayPort->rows;
+
+    // Central clear window sized ~6.5cm x 4.5cm on a ~22cm x 12cm screen.
+    const uint8_t winW = (cols * 65 + 110) / 220;
+    const uint8_t winH = (rows * 45 + 60) / 120;
+    const uint8_t winX0 = (cols - winW) / 2;
+    const uint8_t winY0 = (rows - winH) / 2;
+    const uint8_t winX1 = winX0 + winW - 1;
+    const uint8_t winY1 = winY0 + winH - 1;
+
+    // Keep the flight-direction reference visible inside the window.
+    osdDrawSingleElement(OSD_ARTIFICIAL_HORIZON);
+    osdDrawSingleElement(OSD_CROSSHAIRS);
+
+    for (uint8_t y = 0; y < rows; y++) {
+        for (uint8_t x = 0; x < cols; x++) {
+            if (x >= winX0 && x <= winX1 && y >= winY0 && y <= winY1) {
+                continue;
+            }
+            displayWriteChar(osdDisplayPort, x, y, SYM_CURTAIN);
+        }
+    }
+}
+
 static void osdRefresh(timeUs_t currentTimeUs)
 {
     osdFilterData(currentTimeUs);
@@ -4970,12 +5001,19 @@ static void osdRefresh(timeUs_t currentTimeUs)
 
 #ifdef USE_CMS
     if (!displayIsGrabbed(osdDisplayPort)) {
+        static bool curtainActive = false;
+        bool curtainWanted = IS_RC_MODE_ACTIVE(BOXUSER3);
         displayBeginTransaction(osdDisplayPort, DISPLAY_TRANSACTION_OPT_RESET_DRAWING);
-        if (fullRedraw) {
+        if (fullRedraw || (curtainWanted != curtainActive)) {
             displayClearScreen(osdDisplayPort);
             fullRedraw = false;
+            curtainActive = curtainWanted;
         }
-        osdDrawNextElement();
+        if (curtainActive) {
+            osdDrawPrivacyCurtain();
+        } else {
+            osdDrawNextElement();
+        }
         displayHeartbeat(osdDisplayPort);
         displayCommitTransaction(osdDisplayPort);
 #ifdef OSD_CALLS_CMS
