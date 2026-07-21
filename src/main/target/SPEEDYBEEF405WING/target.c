@@ -29,8 +29,11 @@ timerHardware_t timerHardware[] = {
     DEF_TIM(TIM3,   CH4, PB1,  TIM_USE_OUTPUT_AUTO,   1, 0), // S4 D(1,2,5)
     DEF_TIM(TIM8,   CH3, PC8,  TIM_USE_OUTPUT_AUTO,   1, 0), // S5 D(2,4,7)
     DEF_TIM(TIM8,   CH4, PC9,  TIM_USE_OUTPUT_AUTO,   1, 0), // S6 D(2,7,7)
-    
-    DEF_TIM(TIM8,  CH2N, PB14, TIM_USE_OUTPUT_AUTO,   1, 0), // S7
+
+    // S7 (PB14) is TIM8_CH2N, a complementary output. When TIM8 drives the S5/S6
+    // servo channels its complementary output ends up driven high on PB14, so S7
+    // shows a phantom high level. S7 is unused on the Duck, so drop it from the
+    // timer list to keep S7 inert and leave TIM8 with clean CH3/CH4 outputs.
     DEF_TIM(TIM2,   CH1, PA15, TIM_USE_OUTPUT_AUTO,   1, 0), // S8
     // S9 (PB10) is used as PINIO2 (arming high-level output), not as a PWM output
     DEF_TIM(TIM2,   CH4, PB11, TIM_USE_OUTPUT_AUTO,   1, 0), // S10
