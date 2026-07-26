@@ -3356,6 +3356,49 @@ static void cliPinio(char *cmdline)
 }
 #endif
 
+// Pad-mapping diagnostic: drive an arbitrary MCU pin to a steady level so the
+// physical pad it comes out on can be located with a multimeter. Unlike the
+// servo outputs this bypasses the RC link, the mixer and PWM entirely, and
+// unlike "pinio" it is not limited to the four PINIO slots.
+//   gpio B14 1   -> drive PB14 high
+static void cliGpio(char *cmdline)
+{
+    char *saveptr;
+    char *pinStr = strtok_r(cmdline, " ", &saveptr);
+    char *stateStr = strtok_r(NULL, " ", &saveptr);
+
+    if (!pinStr || !stateStr) {
+        cliShowParseError();
+        return;
+    }
+
+    const char portChar = sl_toupper((unsigned char)pinStr[0]);
+    const int pin = fastA2I(pinStr + 1);
+
+    if (portChar < 'A' || portChar > 'H' || pin < 0 || pin > 15) {
+        cliPrintLine("expected pin like B14 (port A-H, pin 0-15)");
+        return;
+    }
+
+    const int state = fastA2I(stateStr);
+    if (state != 0 && state != 1) {
+        cliShowArgumentRangeError("state", 0, 1);
+        return;
+    }
+
+    IO_t io = IOGetByTag(DEFIO_TAG_MAKE(portChar - 'A', pin));
+    if (!io) {
+        cliPrintLinef("P%c%d: not available on this MCU", portChar, pin);
+        return;
+    }
+
+    IOInit(io, OWNER_FREE, RESOURCE_OUTPUT, 0);
+    IOConfigGPIO(io, IOCFG_OUT_PP);
+    IOWrite(io, state);
+
+    cliPrintLinef("P%c%d: %d", portChar, pin, state);
+}
+
 static void cliPlaySound(char *cmdline)
 {
     int i;
@@ -4406,6 +4449,7 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("fwapproach", "Fixed Wing Approach Settings", NULL, cliFwAutolandApproach),
 #endif
     CLI_COMMAND_DEF("get", "get variable value", "[name]", cliGet),
+    CLI_COMMAND_DEF("gpio", "drive an MCU pin high/low", "<port><pin> <0|1>\r\n", cliGpio),
 #ifdef USE_GPS
     CLI_COMMAND_DEF("gpspassthrough", "passthrough gps to serial", NULL, cliGpsPassthrough),
 #endif
