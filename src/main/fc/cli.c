@@ -58,6 +58,7 @@ bool cliMode = false;
 #include "drivers/flash.h"
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
+#include "drivers/pinio.h"
 #include "drivers/osd_symbols.h"
 #include "drivers/persistent.h"
 #include "drivers/sdcard/sdcard.h"
@@ -3299,6 +3300,62 @@ static void cliMotor(char *cmdline)
     cliPrintLinef("motor %d: %d", motor_index, motor_disarmed[motor_index]);
 }
 
+#ifdef USE_PINIO
+// Pad-mapping diagnostic: drive a PINIO pin directly so the physical pad it
+// comes out on can be found with a multimeter, without involving the RC link,
+// the mixer or PWM. "pinio" alone lists which MCU pin each index maps to.
+static void cliPinio(char *cmdline)
+{
+    int index = 0;
+    int state = 0;
+    int argCount = 0;
+    char *saveptr;
+
+    if (isEmpty(cmdline)) {
+        for (int i = 0; i < pinioHardwareCount; i++) {
+            const ioTag_t ioTag = pinioHardware[i].ioTag;
+            if (ioTag) {
+                cliPrintLinef("pinio %d: P%c%d", i + 1, 'A' + (ioTag >> 4) - 1, ioTag & 0x0F);
+            } else {
+                cliPrintLinef("pinio %d: none", i + 1);
+            }
+        }
+        return;
+    }
+
+    for (char *pch = strtok_r(cmdline, " ", &saveptr); pch != NULL; pch = strtok_r(NULL, " ", &saveptr)) {
+        switch (argCount) {
+            case 0:
+                index = fastA2I(pch);
+                break;
+            case 1:
+                state = fastA2I(pch);
+                break;
+        }
+        argCount++;
+    }
+
+    if (index < 1 || index > pinioHardwareCount) {
+        cliShowArgumentRangeError("index", 1, pinioHardwareCount);
+        return;
+    }
+
+    if (argCount != 2 || (state != 0 && state != 1)) {
+        cliShowArgumentRangeError("state", 0, 1);
+        return;
+    }
+
+    const ioTag_t ioTag = pinioHardware[index - 1].ioTag;
+    if (!ioTag) {
+        cliPrintLinef("pinio %d: none", index);
+        return;
+    }
+
+    pinioSet(index - 1, state);
+    cliPrintLinef("pinio %d (P%c%d): %d", index, 'A' + (ioTag >> 4) - 1, ioTag & 0x0F, state);
+}
+#endif
+
 static void cliPlaySound(char *cmdline)
 {
     int i;
@@ -4363,6 +4420,9 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("motor",  "get/set motor", "<index> [<value>]", cliMotor),
 #ifdef USE_USB_MSC
     CLI_COMMAND_DEF("msc", "switch into msc mode", NULL, cliMsc),
+#endif
+#ifdef USE_PINIO
+    CLI_COMMAND_DEF("pinio", "list or drive PINIO pins", "[<index> <0|1>]\r\n", cliPinio),
 #endif
     CLI_COMMAND_DEF("play_sound", NULL, "[<index>]\r\n", cliPlaySound),
     CLI_COMMAND_DEF("profile", "change profile",
