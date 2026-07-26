@@ -28,12 +28,15 @@ timerHardware_t timerHardware[] = {
     DEF_TIM(TIM3,   CH3, PB0,  TIM_USE_OUTPUT_AUTO,   1, 0), // S3 D(1,7,5)
     DEF_TIM(TIM3,   CH4, PB1,  TIM_USE_OUTPUT_AUTO,   1, 0), // S4 D(1,2,5)
     DEF_TIM(TIM8,   CH3, PC8,  TIM_USE_OUTPUT_AUTO,   1, 0), // S5 D(2,4,7)
-    // PAD-MAPPING DIAGNOSTIC BUILD (not for flight): PC9, PB10, PA15 and PB11 are
-    // driven as PINIO instead of PWM so each can be identified with a multimeter,
-    // so they are omitted here. PB14 (TIM8_CH2N) stays out as well - it is a
-    // complementary output that gets driven high whenever TIM8 runs the S5 servo.
-    // The first three servo outputs (PB0/PB1/PC8 -> S3/S4/S5) are untouched.
-    DEF_TIM(TIM12,  CH2, PB15, TIM_USE_OUTPUT_AUTO,   1, 0), // S11 
+    DEF_TIM(TIM8,   CH4, PC9,  TIM_USE_OUTPUT_AUTO,   1, 0), // S6 D(2,7,7)
+
+    // Pads below are numbered per the measured silkscreen, not the schematic.
+    // PA15 (S9) is the PINIO2 arming high-level output, so it is not a PWM pad.
+    // PB10 (S7) is deliberately left out: S7 must stay inert on this airframe.
+    // PB14 (S11) is TIM8_CH2N, a complementary output sharing TIM8 with the S5
+    // and S6 servos, so it is left out to keep those two channels clean.
+    DEF_TIM(TIM2,   CH4, PB11, TIM_USE_OUTPUT_AUTO,   1, 0), // S8
+    DEF_TIM(TIM12,  CH2, PB15, TIM_USE_OUTPUT_AUTO,   1, 0), // S12
 
     DEF_TIM(TIM1,   CH1, PA8,  TIM_USE_LED,   0, 0), //2812LED  D(1,5,3)
     DEF_TIM(TIM5,   CH3, PA2,  TIM_USE_ANY,   0, 0), //TX2  softserial1_Tx

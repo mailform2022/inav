@@ -196,17 +196,9 @@
 
 #define USE_PINIO
 #define USE_PINIOBOX
-// PAD-MAPPING DIAGNOSTIC BUILD (not for flight).
-// Four candidate output pins are exposed as PINIO so each can be driven to a
-// steady, meter-readable high level from a distinct CH8 window. This maps the
-// board's physical S-pad silkscreen to actual MCU pins.
-//   PINIO1 PC9  <- USER1 (47)
-//   PINIO2 PB10 <- USER2 (48)
-//   PINIO3 PA15 <- USER3 (57)
-//   PINIO4 PB11 <- USER4 (58)
-// PC13 (dual-camera switch) is not driven in this build, so video may be
-// unreliable while diagnosing.
-#define PINIO1_PIN                  PC9
-#define PINIO2_PIN                  PB10
-#define PINIO3_PIN                  PA15
-#define PINIO4_PIN                  PB11
+// Pad numbering on this airframe's board does not follow the SpeedyBee
+// schematic. Measured with the CLI "gpio" command against the silkscreen:
+//   PB0 -> S3, PB10 -> S7, PA15 -> S9, PB11 -> S8, PB14 -> S11, PB15 -> S12
+// so the arming ("vzvod") high-level output must sit on PA15, not PB10.
+#define PINIO1_PIN                  PC13    // USER1 -> dual-camera video switch (C1/C2)
+#define PINIO2_PIN                  PA15    // USER2 -> S9 arming ("vzvod") high-level output
