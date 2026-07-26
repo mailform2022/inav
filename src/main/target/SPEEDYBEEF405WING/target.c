@@ -28,15 +28,11 @@ timerHardware_t timerHardware[] = {
     DEF_TIM(TIM3,   CH3, PB0,  TIM_USE_OUTPUT_AUTO,   1, 0), // S3 D(1,7,5)
     DEF_TIM(TIM3,   CH4, PB1,  TIM_USE_OUTPUT_AUTO,   1, 0), // S4 D(1,2,5)
     DEF_TIM(TIM8,   CH3, PC8,  TIM_USE_OUTPUT_AUTO,   1, 0), // S5 D(2,4,7)
-    DEF_TIM(TIM8,   CH4, PC9,  TIM_USE_OUTPUT_AUTO,   1, 0), // S6 D(2,7,7)
-
-    // S7 (PB14) is TIM8_CH2N, a complementary output. When TIM8 drives the S5/S6
-    // servo channels its complementary output ends up driven high on PB14, so S7
-    // shows a phantom high level. S7 is unused on the Duck, so drop it from the
-    // timer list to keep S7 inert and leave TIM8 with clean CH3/CH4 outputs.
-    DEF_TIM(TIM2,   CH1, PA15, TIM_USE_OUTPUT_AUTO,   1, 0), // S8
-    // S9 (PB10) is used as PINIO2 (arming high-level output), not as a PWM output
-    DEF_TIM(TIM2,   CH4, PB11, TIM_USE_OUTPUT_AUTO,   1, 0), // S10
+    // PAD-MAPPING DIAGNOSTIC BUILD (not for flight): PC9, PB10, PA15 and PB11 are
+    // driven as PINIO instead of PWM so each can be identified with a multimeter,
+    // so they are omitted here. PB14 (TIM8_CH2N) stays out as well - it is a
+    // complementary output that gets driven high whenever TIM8 runs the S5 servo.
+    // The first three servo outputs (PB0/PB1/PC8 -> S3/S4/S5) are untouched.
     DEF_TIM(TIM12,  CH2, PB15, TIM_USE_OUTPUT_AUTO,   1, 0), // S11 
 
     DEF_TIM(TIM1,   CH1, PA8,  TIM_USE_LED,   0, 0), //2812LED  D(1,5,3)
