@@ -3989,6 +3989,10 @@ static void cliStatus(char *cmdline)
                 vtxConfig()->vtx3g3TrampPwrCode[0], vtxConfig()->vtx3g3TrampPwrCode[1],
                 vtxConfig()->vtx3g3TrampPwrCode[2]);
         cliPrintLinefeed();
+        cliPrintLinef("VTX 3G3 grid: %s bands=%d range=%d-%dMHz selFreq=%d",
+                vtx3G3_GridIsTx3339() ? "TX3339" : "SX33",
+                vtx3G3_BandCount(), vtx3G3_FreqMin(), vtx3G3_FreqMax(),
+                vtx3G3_Bandchan2Freq(vtxSettingsConfig()->band, vtxSettingsConfig()->channel));
     }
 #endif
 #endif

@@ -42,6 +42,11 @@ typedef enum {
     VTX_3G3_CHAN_NONE,         // Never command band/channel; leave what the buttons set
 } vtx3g3ChannelMode_e;
 
+typedef enum {
+    VTX_3G3_GRID_SX33 = 0,     // SX33 / FF3741: 5 bands A-E, 3200-3700 MHz, 25mW/2W/5W
+    VTX_3G3_GRID_TX3339,       // BeastFPV TX3339-32CH: 4 bands A-D, 3060-3480 MHz, 25mW/3W/10W
+} vtx3g3Grid_e;
+
 typedef struct vtxConfig_s {
     vtxChannelActivationCondition_t vtxChannelActivationConditions[MAX_CHANNEL_ACTIVATION_CONDITION_COUNT];
     uint8_t halfDuplex;
@@ -57,6 +62,7 @@ typedef struct vtxConfig_s {
     uint8_t vtx3g3ChanInterByteMs;   // gap between SET_CHANNEL frame bytes on the wire
     uint8_t vtx3g3ChanSettleMs;      // pause after the SET_CHANNEL frame
     bool    vtx3g3SaPulldown;        // pull the SmartAudio line LOW while idle (FF3741 video stripes)
+    uint8_t vtx3g3Grid;              // Which 3.3GHz band/channel grid the attached VTX uses
     uint16_t vtx3g3TrampPwrCode[3];  // IRC Tramp (SX33) 3.3GHz device power codes per grid level
     bool    vtx3g3ChanFreqFix;       // after SET_CHANNEL, also SET_FREQ the real grid MHz (FF3741 stuck freqMode)
 } vtxConfig_t;

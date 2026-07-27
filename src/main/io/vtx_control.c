@@ -41,7 +41,7 @@
 
 #if defined(USE_VTX_CONTROL)
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 12);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxConfig_t, vtxConfig, PG_VTX_CONFIG, 13);
 
 PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .halfDuplex = SETTING_VTX_HALFDUPLEX_DEFAULT,
@@ -57,6 +57,7 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .vtx3g3ChanInterByteMs = SETTING_VTX_3G3_CHAN_INTERBYTE_MS_DEFAULT,
       .vtx3g3ChanSettleMs = SETTING_VTX_3G3_CHAN_SETTLE_MS_DEFAULT,
       .vtx3g3SaPulldown = SETTING_VTX_3G3_SA_PULLDOWN_DEFAULT,
+      .vtx3g3Grid = SETTING_VTX_3G3_GRID_DEFAULT,
       .vtx3g3TrampPwrCode = {
           SETTING_VTX_3G3_TRAMP_PWR1_DEFAULT,
           SETTING_VTX_3G3_TRAMP_PWR2_DEFAULT,
