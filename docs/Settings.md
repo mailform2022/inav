@@ -6152,6 +6152,16 @@ On the 3.3GHz (FF3741) grid, clear pit mode and force channel mode when applying
 
 ---
 
+### vtx_3g3_grid
+
+Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. SX33 (default): the SX33/FF3741 grid, 5 bands A-E over 3200-3700MHz, 25mW/2W/5W. TX3339: the BeastFPV TX3339-32CH grid, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| SX33 |  |  |
+
+---
+
 ### vtx_3g3_keepalive
 
 On the 3.3GHz (FF3741) grid, keep polling the VTX (liveness poll) and re-apply band/channel/power once after a reconnect. OFF (default) makes the FC apply settings once and then stay completely silent, which keeps the video stable (the FF3741 glitches the image on any SmartAudio traffic). With OFF, power-cycling only the VTX requires a FC reboot to re-apply settings.
