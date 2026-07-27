@@ -52,7 +52,11 @@ var VTX = (function() {
             throw new Error('Invalid JSON: expected an object');
         }
 
-        var rawBands = raw.bands || raw.bands_list;
+        /* Vendor files are usually exported by Betaflight, which nests everything
+         * under "vtx_table". Accept both that and our flat layout. */
+        var src = (raw.vtx_table && typeof raw.vtx_table === 'object') ? raw.vtx_table : raw;
+
+        var rawBands = src.bands || src.bands_list;
         if (!Array.isArray(rawBands) || rawBands.length < 1 || rawBands.length > 8) {
             throw new Error('Field "bands" must be an array of 1..8 bands');
         }
@@ -82,22 +86,31 @@ var VTX = (function() {
             });
         }
 
-        var rawPower = raw.powerlevels || raw.powerLevels;
+        var rawPower = src.powerlevels || src.powerLevels || src.powerlevels_list;
         if (!Array.isArray(rawPower) || rawPower.length < 1 || rawPower.length > 8) {
             throw new Error('Field "powerlevels" must be an array of 1..8 levels');
         }
+        /* A level is either a bare number (mW) or Betaflight's {value, label}, where
+         * value is the code sent to the VTX and label is what the pilot should see. */
+        var powerLevels = [];
+        var powerLabels = [];
         for (var p = 0; p < rawPower.length; p++) {
-            var pw = rawPower[p];
+            var entry = rawPower[p];
+            var pw = (entry && typeof entry === 'object') ? entry.value : entry;
             if (typeof pw !== 'number' || pw < 0 || pw > self.POWER_MAX_MW) {
-                throw new Error('Power level ' + (p + 1) + ': must be 0..' + self.POWER_MAX_MW + ' mW');
+                throw new Error('Power level ' + (p + 1) + ': must be 0..' + self.POWER_MAX_MW);
             }
+            powerLevels.push(pw);
+            var lbl = (entry && typeof entry === 'object' && entry.label) ? String(entry.label).trim() : '';
+            powerLabels.push(lbl);
         }
 
         return {
-            name: raw.name ? String(raw.name) : 'Custom VTX Grid',
-            protocol: raw.protocol ? String(raw.protocol) : '',
+            name: (raw.name || src.name) ? String(raw.name || src.name) : 'Custom VTX Grid',
+            protocol: (raw.protocol || src.protocol) ? String(raw.protocol || src.protocol) : '',
             bands_list: bands,
-            powerLevels: rawPower.slice()
+            powerLevels: powerLevels,
+            powerLabels: powerLabels
         };
     };
 
@@ -181,8 +194,12 @@ var VTX = (function() {
     self.getProgrammingPowerList = function () {
         var list = [];
         if (self.hasCustomGrid()) {
+            var labels = self.customVtxTable.powerLabels || [];
             for (var i = 0; i < self.customVtxTable.powerLevels.length; i++) {
-                list.push({ value: i + 1, label: self.customVtxTable.powerLevels[i] + ' mW' });
+                list.push({
+                    value: i + 1,
+                    label: labels[i] || (self.customVtxTable.powerLevels[i] + ' mW')
+                });
             }
         } else {
             for (var j = 1; j <= 5; j++) {
