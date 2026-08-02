@@ -93,6 +93,7 @@
 #include "io/serial.h"
 #include "io/serial_4way.h"
 #include "io/vtx.h"
+#include "io/vtx_control.h"
 #include "io/vtx_string.h"
 #include "io/gps_private.h"  //for MSP_SIMULATOR
 
@@ -1457,7 +1458,18 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
                 // Betaflight < 4 doesn't send these fields
                 sbufWriteU8(dst, vtxCommonDeviceIsReady(vtxDevice) ? 1 : 0);
                 sbufWriteU8(dst, vtxSettingsConfig()->lowPowerDisarm);
-                // future extensions here...
+
+                // INAV extension: which frequency grid the FC is actually using and
+                // how it decided, so the configurator can show the same grid as the FC
+                // instead of whatever was last loaded from a JSON file.
+                const vtx3G3DeviceReport_t *report = vtx3G3_DeviceReport();
+                sbufWriteU8(dst, vtxSettingsConfig()->frequencyGroup);
+                sbufWriteU8(dst, vtxConfig()->vtx3g3Grid);                                      // configured: SX33/TX3339/AUTO
+                sbufWriteU8(dst, vtx3G3_GridIsTx3339() ? VTX_3G3_GRID_TX3339 : VTX_3G3_GRID_SX33); // effective
+                sbufWriteU8(dst, vtx3G3_DetectSource());
+                sbufWriteU16(dst, report->freqMin);
+                sbufWriteU16(dst, report->freqMax);
+                sbufWriteU16(dst, report->powerMax);
             }
             else {
                 sbufWriteU8(dst, VTXDEV_UNKNOWN); // no VTX configured

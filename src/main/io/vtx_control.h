@@ -45,7 +45,19 @@ typedef enum {
 typedef enum {
     VTX_3G3_GRID_SX33 = 0,     // SX33 / FF3741: 5 bands A-E, 3200-3700 MHz, 25mW/2W/5W
     VTX_3G3_GRID_TX3339,       // BeastFPV TX3339-32CH: 4 bands A-D, 3060-3480 MHz, 25mW/3W/10W
+    VTX_3G3_GRID_AUTO,         // Pick from what the attached VTX reports, SX33 if it says nothing useful
 } vtx3g3Grid_e;
+
+/* How the active 3.3GHz grid was arrived at, reported over CLI and MSP so a wrong
+ * guess is visible instead of silently mistuning the VTX. */
+typedef enum {
+    VTX_3G3_DETECT_NONE = 0,   // Nothing heard from a VTX yet
+    VTX_3G3_DETECT_FORCED,     // vtx_3g3_grid names the grid explicitly
+    VTX_3G3_DETECT_RANGE,      // Recognised from the frequency range the VTX reported
+    VTX_3G3_DETECT_POWER,      // Recognised from the max power the VTX reported
+    VTX_3G3_DETECT_PROTOCOL,   // Recognised from the protocol in use (SmartAudio => FF3741)
+    VTX_3G3_DETECT_FALLBACK,   // VTX reported nothing usable, fell back to SX33
+} vtx3g3Detect_e;
 
 typedef struct vtxConfig_s {
     vtxChannelActivationCondition_t vtxChannelActivationConditions[MAX_CHANNEL_ACTIVATION_CONDITION_COUNT];

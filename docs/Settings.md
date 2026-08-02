@@ -6154,11 +6154,11 @@ On the 3.3GHz (FF3741) grid, clear pit mode and force channel mode when applying
 
 ### vtx_3g3_grid
 
-Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. SX33 (default): the SX33/FF3741 grid, 5 bands A-E over 3200-3700MHz, 25mW/2W/5W. TX3339: the BeastFPV TX3339-32CH grid, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range.
+Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. AUTO (default): identify the VTX from what it reports - a SmartAudio device is an FF3741 (SX33 grid), an IRC Tramp device is classified by the frequency range and max power it answers with, and anything unrecognised falls back to SX33. SX33: force the SX33/FF3741 grid, 5 bands A-E over 3200-3700MHz, 25mW/2W/5W. TX3339: force the BeastFPV TX3339-32CH grid, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range. 'status' shows the grid in use and how it was chosen.
 
 | Default | Min | Max |
 | --- | --- | --- |
-| SX33 |  |  |
+| AUTO |  |  |
 
 ---
 

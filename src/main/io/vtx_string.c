@@ -186,9 +186,71 @@ const char * const vtx3G3Tx3339PowerNames[VTX_STRING_3G3_POWER_COUNT + 1] = {
     "---", "25 ", "3W ", "10W"
 };
 
+#if defined(USE_VTX_CONTROL)
+/* What the attached VTX said about itself, kept raw so a wrong guess can be traced
+ * back to the device's own answer instead of to the classifier. */
+static vtx3G3DeviceReport_t vtx3G3Report = {
+    .grid = VTX_3G3_GRID_SX33,
+    .detect = VTX_3G3_DETECT_NONE,
+};
+
+/* Recognising a 3.3GHz VTX from its IRC Tramp capability answer is only possible
+ * because the two known devices answer differently:
+ *   TX3339-32CH reports its real 3060-3480 MHz range and a four-figure max power;
+ *   SX33 reports a generic 5.8GHz range and ~600 mW no matter what it is tuned to.
+ * Anything else is not guessed at - SX33 stays the fallback, because that is the
+ * grid this firmware has always used for the 3G3 group. */
+void vtx3G3_ReportTrampCapabilities(uint16_t freqMin, uint16_t freqMax, uint16_t powerMax)
+{
+    vtx3G3Report.freqMin = freqMin;
+    vtx3G3Report.freqMax = freqMax;
+    vtx3G3Report.powerMax = powerMax;
+
+    const bool sane = (freqMin != 0) && (freqMin < freqMax);
+
+    if (sane && freqMin <= 3100 && freqMax >= 3450 && freqMax <= 3600) {
+        vtx3G3Report.grid = VTX_3G3_GRID_TX3339;
+        vtx3G3Report.detect = VTX_3G3_DETECT_RANGE;
+    } else if (sane && freqMin >= 3150 && freqMin <= 3250 && freqMax >= 3650) {
+        vtx3G3Report.grid = VTX_3G3_GRID_SX33;
+        vtx3G3Report.detect = VTX_3G3_DETECT_RANGE;
+    } else if (powerMax >= 3000) {
+        // Only the 10W unit claims this much; the SX33's generic answer is ~600 mW.
+        vtx3G3Report.grid = VTX_3G3_GRID_TX3339;
+        vtx3G3Report.detect = VTX_3G3_DETECT_POWER;
+    } else {
+        vtx3G3Report.grid = VTX_3G3_GRID_SX33;
+        vtx3G3Report.detect = VTX_3G3_DETECT_FALLBACK;
+    }
+}
+
+/* SmartAudio on the 3.3GHz group means an FF3741, which shares the SX33 grid.
+ * The TX3339 is IRC Tramp only, so the protocol alone settles it. */
+void vtx3G3_ReportSmartAudioDevice(void)
+{
+    vtx3G3Report.grid = VTX_3G3_GRID_SX33;
+    vtx3G3Report.detect = VTX_3G3_DETECT_PROTOCOL;
+}
+
+const vtx3G3DeviceReport_t * vtx3G3_DeviceReport(void)
+{
+    return &vtx3G3Report;
+}
+
+uint8_t vtx3G3_DetectSource(void)
+{
+    return (vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_AUTO)
+        ? vtx3G3Report.detect
+        : VTX_3G3_DETECT_FORCED;
+}
+#endif
+
 bool vtx3G3_GridIsTx3339(void)
 {
 #if defined(USE_VTX_CONTROL)
+    if (vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_AUTO) {
+        return vtx3G3Report.grid == VTX_3G3_GRID_TX3339;
+    }
     return vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_TX3339;
 #else
     return false;

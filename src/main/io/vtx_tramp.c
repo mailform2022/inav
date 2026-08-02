@@ -237,6 +237,13 @@ static vtxProtoResponseType_e vtxProtoProcessResponse(void)
             vtxState.capabilities.freqMax = vtxState.recvPkt[4] | (vtxState.recvPkt[5] << 8);
             vtxState.capabilities.powerMax = vtxState.recvPkt[6] | (vtxState.recvPkt[7] << 8);
 
+            // Hand the untouched answer to the 3.3GHz classifier before the overrides
+            // below rewrite it - the overrides would otherwise make every device look
+            // like whichever grid is already selected.
+            vtx3G3_ReportTrampCapabilities(vtxState.capabilities.freqMin,
+                                           vtxState.capabilities.freqMax,
+                                           vtxState.capabilities.powerMax);
+
             if (vtxState.capabilities.freqMin != 0 && vtxState.capabilities.freqMin < vtxState.capabilities.freqMax) {
                 // The SX33 (3.3 GHz IRC Tramp) reports generic 5.8 GHz capabilities
                 // (a 5.8 GHz frequency range and ~600 mW max) regardless of its real

@@ -28,7 +28,21 @@ uint16_t vtx1G3_Bandchan2Freq(uint8_t band, uint8_t channel);
 uint16_t vtx3G3_Bandchan2Freq(uint8_t band, uint8_t channel);
 
 /* The 3.3GHz group covers two incompatible VTX families, selected by
- * vtx_3g3_grid: the SX33/FF3741 grid and the BeastFPV TX3339-32CH grid. */
+ * vtx_3g3_grid: the SX33/FF3741 grid and the BeastFPV TX3339-32CH grid.
+ * vtx_3g3_grid = AUTO picks between them from what the VTX reports. */
+typedef struct {
+    uint16_t freqMin;       // raw IRC Tramp 'r' answer, before any override
+    uint16_t freqMax;
+    uint16_t powerMax;
+    uint8_t  grid;          // vtx3g3Grid_e the classifier settled on
+    uint8_t  detect;        // vtx3g3Detect_e - how it got there
+} vtx3G3DeviceReport_t;
+
+void vtx3G3_ReportTrampCapabilities(uint16_t freqMin, uint16_t freqMax, uint16_t powerMax);
+void vtx3G3_ReportSmartAudioDevice(void);
+const vtx3G3DeviceReport_t * vtx3G3_DeviceReport(void);
+uint8_t vtx3G3_DetectSource(void);
+
 bool vtx3G3_GridIsTx3339(void);
 uint8_t vtx3G3_BandCount(void);
 uint16_t vtx3G3_FreqMin(void);

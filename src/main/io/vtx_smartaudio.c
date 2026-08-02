@@ -334,6 +334,11 @@ static void saProcessResponse(uint8_t *buf, int len)
         // From spec: "Bit 7-3 is holding the Smart audio version where 0 is V1, 1 is V2, 2 is V2.1"
         // saDevice.version = 0 means unknown, 1 means Smart audio V1, 2 means Smart audio V2 and 3 means Smart audio V2.1
         saDevice.version = (buf[0] == SA_CMD_GET_SETTINGS) ? 1 : ((buf[0] == SA_CMD_GET_SETTINGS_V2) ? 2 : 3);
+
+        // A 3.3GHz VTX answering SmartAudio is an FF3741, which uses the SX33 grid.
+        // The TX3339 speaks IRC Tramp only, so the protocol settles the grid here.
+        vtx3G3_ReportSmartAudioDevice();
+
         saDevice.channel = buf[2];
         uint8_t rawPowerValue = buf[3];
         saDevice.mode = buf[4];

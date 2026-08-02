@@ -128,7 +128,7 @@ tables:
     values: ["CHANNEL", "FREQUENCY", "NONE"]
     enum: vtx3g3ChannelMode_e
   - name: vtx_3g3_grids
-    values: ["SX33", "TX3339"]
+    values: ["SX33", "TX3339", "AUTO"]
     enum: vtx3g3Grid_e
   - name: filter_type
     values: ["PT1", "BIQUAD"]
@@ -3875,8 +3875,8 @@ groups:
         field: vtx3g3SaPulldown
         type: bool
       - name: vtx_3g3_grid
-        description: "Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. SX33 (default): the SX33/FF3741 grid, 5 bands A-E over 3200-3700MHz, 25mW/2W/5W. TX3339: the BeastFPV TX3339-32CH grid, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range."
-        default_value: "SX33"
+        description: "Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. AUTO (default): identify the VTX from what it reports - a SmartAudio device is an FF3741 (SX33 grid), an IRC Tramp device is classified by the frequency range and max power it answers with, and anything unrecognised falls back to SX33. SX33: force the SX33/FF3741 grid, 5 bands A-E over 3200-3700MHz, 25mW/2W/5W. TX3339: force the BeastFPV TX3339-32CH grid, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range. 'status' shows the grid in use and how it was chosen."
+        default_value: "AUTO"
         field: vtx3g3Grid
         table: vtx_3g3_grids
         type: uint8_t
