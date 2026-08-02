@@ -26,6 +26,8 @@
 #include "build/debug.h"
 
 #include "config/parameter_group.h"
+#include "drivers/vtx_common.h"
+#include "io/vtx.h"
 #include "io/vtx_control.h"
 #include "io/vtx_string.h"
 
@@ -186,13 +188,23 @@ const char * const vtx3G3Tx3339PowerNames[VTX_STRING_3G3_POWER_COUNT + 1] = {
     "---", "25 ", "3W ", "10W"
 };
 
-#if defined(USE_VTX_CONTROL)
 /* What the attached VTX said about itself, kept raw so a wrong guess can be traced
  * back to the device's own answer instead of to the classifier. */
 static vtx3G3DeviceReport_t vtx3G3Report = {
     .grid = VTX_3G3_GRID_SX33,
     .detect = VTX_3G3_DETECT_NONE,
 };
+
+/* Classification describes a 3.3GHz device, so a VTX answering while another
+ * frequency group is selected must not leave a verdict behind for the 3G3 grid. */
+static bool vtx3G3_GroupSelected(void)
+{
+#if defined(USE_VTX_COMMON)
+    return vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3;
+#else
+    return false;
+#endif
+}
 
 /* Recognising a 3.3GHz VTX from its IRC Tramp capability answer is only possible
  * because the two known devices answer differently:
@@ -202,6 +214,10 @@ static vtx3G3DeviceReport_t vtx3G3Report = {
  * grid this firmware has always used for the 3G3 group. */
 void vtx3G3_ReportTrampCapabilities(uint16_t freqMin, uint16_t freqMax, uint16_t powerMax)
 {
+    if (!vtx3G3_GroupSelected()) {
+        return;
+    }
+
     vtx3G3Report.freqMin = freqMin;
     vtx3G3Report.freqMax = freqMax;
     vtx3G3Report.powerMax = powerMax;
@@ -228,6 +244,10 @@ void vtx3G3_ReportTrampCapabilities(uint16_t freqMin, uint16_t freqMax, uint16_t
  * The TX3339 is IRC Tramp only, so the protocol alone settles it. */
 void vtx3G3_ReportSmartAudioDevice(void)
 {
+    if (!vtx3G3_GroupSelected()) {
+        return;
+    }
+
     vtx3G3Report.grid = VTX_3G3_GRID_SX33;
     vtx3G3Report.detect = VTX_3G3_DETECT_PROTOCOL;
 }
@@ -239,11 +259,13 @@ const vtx3G3DeviceReport_t * vtx3G3_DeviceReport(void)
 
 uint8_t vtx3G3_DetectSource(void)
 {
-    return (vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_AUTO)
-        ? vtx3G3Report.detect
-        : VTX_3G3_DETECT_FORCED;
-}
+#if defined(USE_VTX_CONTROL)
+    if (vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_AUTO) {
+        return vtx3G3Report.detect;
+    }
 #endif
+    return VTX_3G3_DETECT_FORCED;
+}
 
 bool vtx3G3_GridIsTx3339(void)
 {
