@@ -117,6 +117,64 @@ TABS.configuration.initialize = function (callback, scrollPosition) {
         var config_vtx = $('.config-vtx');
         config_vtx.show();
 
+        // Friendlier names than the raw CLI enum values the setting table provides.
+        var VTX_GRID_LABELS = {};
+        VTX_GRID_LABELS[VTX.GRID_AUTO] = 'configurationVTXGridTypeAuto';
+        VTX_GRID_LABELS[VTX.GRID_SX33] = 'configurationVTXGridTypeSX33';
+        VTX_GRID_LABELS[VTX.GRID_TX3339] = 'configurationVTXGridTypeTX3339';
+
+        function renderVtxGridType() {
+            var $wrapper = $('#vtx_grid_type_wrapper');
+            var $select = $('#vtx_3g3_grid');
+
+            // The setting only exists on 3.3GHz-capable firmware, and only means
+            // anything while the 3.3GHz frequency group is selected.
+            if (!$select.length || !$select.find('option').length || !VTX.fcIs3G3()) {
+                $wrapper.hide();
+                return;
+            }
+            $wrapper.show();
+
+            $select.find('option').each(function () {
+                var key = VTX_GRID_LABELS[parseInt($(this).val())];
+                var label = key ? chrome.i18n.getMessage(key) : null;
+                if (label) {
+                    $(this).text(label);
+                }
+            });
+
+            var g = VTX.fcGrid;
+            var effectiveName = (VTX.BUILTIN_3G3_GRIDS[g.effective] || {}).name || '?';
+            var $detect = $('#vtx_grid_detect');
+
+            if (g.configured === VTX.GRID_AUTO) {
+                var detectKey = 'configurationVTXGridDetect_' + (VTX.DETECT_NAMES[g.detect] || 'none');
+                var how = chrome.i18n.getMessage(detectKey) || VTX.DETECT_NAMES[g.detect];
+                $detect.text(chrome.i18n.getMessage('configurationVTXGridDetected', [
+                    effectiveName, how, String(g.freqMin), String(g.freqMax), String(g.powerMax)
+                ]));
+                // A fallback means the VTX said nothing usable - the grid is a guess.
+                var uncertain = (VTX.DETECT_NAMES[g.detect] === 'fallback' || VTX.DETECT_NAMES[g.detect] === 'none');
+                $detect.toggleClass('vtx_custom_grid_status--error', uncertain)
+                       .toggleClass('vtx_custom_grid_status--ok', !uncertain);
+            } else {
+                $detect.removeClass('vtx_custom_grid_status--error').addClass('vtx_custom_grid_status--ok')
+                       .text(chrome.i18n.getMessage('configurationVTXGridForced', [effectiveName]));
+            }
+
+            // Band/channel labels follow the grid, so re-render on change. The value
+            // itself is written to the FC by Settings.saveInputs() on Save.
+            $select.off('change.vtxgrid').on('change.vtxgrid', function () {
+                var picked = parseInt($(this).val());
+                VTX.fcGrid.configured = picked;
+                if (picked !== VTX.GRID_AUTO) {
+                    VTX.fcGrid.effective = picked;
+                }
+                renderVtxGridType();
+                renderVtxDeviceSettings();
+            });
+        }
+
         function renderVtxGridStatus() {
             var $status = $('#vtx_grid_status');
             if (VTX.hasCustomGrid()) {
@@ -248,6 +306,7 @@ TABS.configuration.initialize = function (callback, scrollPosition) {
                     var normalized = VTX.normalizeGrid(JSON.parse(ev.target.result));
                     VTX.setCustomGrid(normalized);
                     renderVtxGridStatus();
+                    renderVtxGridType();
                     renderVtxDeviceSettings();
                 } catch (err) {
                     $status.removeClass('vtx_custom_grid_status--ok').addClass('vtx_custom_grid_status--error')
@@ -261,10 +320,12 @@ TABS.configuration.initialize = function (callback, scrollPosition) {
             e.preventDefault();
             VTX.clearCustomGrid();
             renderVtxGridStatus();
+            renderVtxGridType();
             renderVtxDeviceSettings();
         });
 
         renderVtxGridStatus();
+        renderVtxGridType();
         renderVtxDeviceSettings();
 
         // for some odd reason chrome 38+ changes scroll according to the touched select element

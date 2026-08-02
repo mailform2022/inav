@@ -1188,6 +1188,52 @@
     "configurationVTX": {
         "message": "VTX"
     },
+    "configurationVTXGridType": {
+        "message": "VTX type (3.3GHz grid)"
+    },
+    "configurationVTXGridTypeHelp": {
+        "message": "Which 3.3GHz transmitter is connected. IRC Tramp and SmartAudio command an absolute frequency, so the wrong grid tunes the VTX to the wrong frequency. Auto-detect identifies the VTX from what it reports and falls back to SX33 if it reports nothing usable. CLI: vtx_3g3_grid"
+    },
+    "configurationVTXGridTypeAuto": {
+        "message": "Auto-detect"
+    },
+    "configurationVTXGridTypeSX33": {
+        "message": "SX33 / FF3741 (5 bands, 3200-3700 MHz, 5 W)"
+    },
+    "configurationVTXGridTypeTX3339": {
+        "message": "BeastFPV TX3339-32CH (4 bands, 3060-3480 MHz, 10 W)"
+    },
+    "configurationVTXGridDetected": {
+        "message": "FC is using: $grid$ (detected by $how$; VTX reported $fmin$-$fmax$ MHz / $pmax$ mW)",
+        "placeholders": {
+            "grid": { "content": "$1" },
+            "how": { "content": "$2" },
+            "fmin": { "content": "$3" },
+            "fmax": { "content": "$4" },
+            "pmax": { "content": "$5" }
+        }
+    },
+    "configurationVTXGridForced": {
+        "message": "FC is using: $grid$ (set manually)",
+        "placeholders": {
+            "grid": { "content": "$1" }
+        }
+    },
+    "configurationVTXGridDetect_none": {
+        "message": "nothing - no VTX has answered yet"
+    },
+    "configurationVTXGridDetect_range": {
+        "message": "the frequency range the VTX reported"
+    },
+    "configurationVTXGridDetect_power": {
+        "message": "the max power the VTX reported"
+    },
+    "configurationVTXGridDetect_protocol": {
+        "message": "the protocol in use (SmartAudio = FF3741)"
+    },
+    "configurationVTXGridDetect_fallback": {
+        "message": "fallback - the VTX reported nothing usable, assuming SX33"
+    },
     "configurationVTXCustomGridHelp": {
         "message": "Load a custom VTX grid (JSON) for the transmitter you use (bands, channels, frequencies and power levels). The grid is also used by the Programming tab. If no grid is loaded, the standard INAV bands are used."
     },

@@ -1221,6 +1221,20 @@ var mspHelper = (function (gui) {
                     // Ignore wether the VTX is ready for now
                     offset++;
                     VTX_CONFIG.low_power_disarm = data.getUint8(offset++);
+
+                    // INAV extension: the grid the FC is really tuning with, and how it
+                    // picked it. Absent on stock firmware, hence the length check.
+                    VTX.fcGrid.valid = false;
+                    if (data.byteLength >= offset + 10) {
+                        VTX.fcGrid.group = data.getUint8(offset++);
+                        VTX.fcGrid.configured = data.getUint8(offset++);
+                        VTX.fcGrid.effective = data.getUint8(offset++);
+                        VTX.fcGrid.detect = data.getUint8(offset++);
+                        VTX.fcGrid.freqMin = data.getUint16(offset, true); offset += 2;
+                        VTX.fcGrid.freqMax = data.getUint16(offset, true); offset += 2;
+                        VTX.fcGrid.powerMax = data.getUint16(offset, true); offset += 2;
+                        VTX.fcGrid.valid = true;
+                    }
                 }
                 break;
             case MSPCodes.MSP_ADVANCED_CONFIG:

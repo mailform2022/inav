@@ -36,6 +36,74 @@ var VTX = (function() {
     self.MAX_FREQUENCY_MHZ = 5999;
 
     /*
+     * Known VTX families the FC can drive, kept in step with the firmware.
+     * The codes are vtx3g3Grid_e; the tables are the same ones the firmware
+     * tunes from, so what is shown here is what the VTX will actually be set to.
+     */
+    self.FREQGROUP_3G3 = 3;
+
+    self.GRID_SX33 = 0;
+    self.GRID_TX3339 = 1;
+    self.GRID_AUTO = 2;
+
+    self.DETECT_NAMES = ['none', 'forced', 'range', 'power', 'protocol', 'fallback'];
+
+    self.BUILTIN_3G3_GRIDS = {};
+    self.BUILTIN_3G3_GRIDS[self.GRID_SX33] = {
+        name: 'SX33 / FF3741 3.3GHz',
+        bands_list: [
+            { name: 'A 3200-3340', frequencies: [3200, 3220, 3240, 3260, 3280, 3300, 3320, 3340] },
+            { name: 'B 3360-3500', frequencies: [3360, 3380, 3400, 3420, 3440, 3460, 3480, 3500] },
+            { name: 'C 3520-3680', frequencies: [3520, 3540, 3560, 3580, 3600, 3620, 3640, 3680] },
+            { name: 'D 3210-3490', frequencies: [3210, 3250, 3290, 3330, 3370, 3410, 3450, 3490] },
+            { name: 'E 3230-3700', frequencies: [3230, 3290, 3350, 3410, 3470, 3530, 3590, 3700] },
+        ],
+        powerLevels: [25, 2000, 5000],
+        powerLabels: ['25 mW', '2 W', '5 W'],
+    };
+    self.BUILTIN_3G3_GRIDS[self.GRID_TX3339] = {
+        name: 'BeastFPV TX3339-32CH 3.3GHz 10W',
+        bands_list: [
+            { name: 'A (FR1) 3330-3470', frequencies: [3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470] },
+            { name: 'B (FR2) 3340-3480', frequencies: [3340, 3360, 3380, 3400, 3420, 3440, 3460, 3480] },
+            { name: 'C (FR3) 3170-3310', frequencies: [3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310] },
+            { name: 'D (FR4) 3060-3200', frequencies: [3060, 3080, 3100, 3120, 3140, 3160, 3180, 3200] },
+        ],
+        powerLevels: [25, 3000, 10000],
+        powerLabels: ['25 mW', '3 W', '10 W'],
+    };
+
+    /* What the FC last reported over MSP_VTX_CONFIG: which grid it is really using
+     * and how it decided. Filled by MSPHelper, so the dropdown shows the FC's own
+     * state rather than whatever this configurator was last told. */
+    self.fcGrid = {
+        valid: false,
+        group: 0,
+        configured: self.GRID_SX33,   // the vtx_3g3_grid setting (may be AUTO)
+        effective: self.GRID_SX33,    // the grid actually in use
+        detect: 0,
+        freqMin: 0,
+        freqMax: 0,
+        powerMax: 0,
+    };
+
+    self.fcIs3G3 = function () {
+        return self.fcGrid.valid && self.fcGrid.group === self.FREQGROUP_3G3;
+    };
+
+    /* A manually loaded JSON grid wins over the built-in table, so an odd or
+     * substitute vendor grid can still be used without a firmware change. */
+    self.getActiveGrid = function () {
+        if (self.hasCustomGrid()) {
+            return self.customVtxTable;
+        }
+        if (self.fcIs3G3()) {
+            return self.BUILTIN_3G3_GRIDS[self.fcGrid.effective] || null;
+        }
+        return null;
+    };
+
+    /*
      * Custom VTX grid (loaded from a user JSON file). When present it overrides
      * the built-in band/channel/power tables in Configuration and Programming.
      * It is persisted in localStorage so it survives tab switches and restarts.
@@ -145,8 +213,9 @@ var VTX = (function() {
 
     /* Bands as {code, name} for the Configuration dropdown. */
     self.getBands = function () {
-        if (self.hasCustomGrid()) {
-            return self.customVtxTable.bands_list.map(function (b, idx) {
+        var grid = self.getActiveGrid();
+        if (grid) {
+            return grid.bands_list.map(function (b, idx) {
                 return { code: idx + 1, name: b.name };
             });
         }
@@ -154,15 +223,17 @@ var VTX = (function() {
     };
 
     self.getChannelCount = function () {
-        if (self.hasCustomGrid()) {
-            return self.customVtxTable.bands_list[0].frequencies.length;
+        var grid = self.getActiveGrid();
+        if (grid) {
+            return grid.bands_list[0].frequencies.length;
         }
         return self.CHANNEL_MAX;
     };
 
     self.getFrequency = function (band, channel) {
-        if (self.hasCustomGrid()) {
-            var b = self.customVtxTable.bands_list[band - 1];
+        var grid = self.getActiveGrid();
+        if (grid) {
+            var b = grid.bands_list[band - 1];
             if (b && b.frequencies[channel - 1] != null) {
                 return b.frequencies[channel - 1];
             }
@@ -180,7 +251,8 @@ var VTX = (function() {
     self.getProgrammingChannelList = function () {
         var list = [];
         var count = self.getChannelCount();
-        var refBand = self.hasCustomGrid() ? self.customVtxTable.bands_list[0] : null;
+        var activeGrid = self.getActiveGrid();
+        var refBand = activeGrid ? activeGrid.bands_list[0] : null;
         for (var i = 1; i <= count; i++) {
             var label = 'CH ' + i;
             if (refBand && refBand.frequencies[i - 1] != null) {
@@ -193,12 +265,13 @@ var VTX = (function() {
 
     self.getProgrammingPowerList = function () {
         var list = [];
-        if (self.hasCustomGrid()) {
-            var labels = self.customVtxTable.powerLabels || [];
-            for (var i = 0; i < self.customVtxTable.powerLevels.length; i++) {
+        var grid = self.getActiveGrid();
+        if (grid) {
+            var labels = grid.powerLabels || [];
+            for (var i = 0; i < grid.powerLevels.length; i++) {
                 list.push({
                     value: i + 1,
-                    label: labels[i] || (self.customVtxTable.powerLevels[i] + ' mW')
+                    label: labels[i] || (grid.powerLevels[i] + ' mW')
                 });
             }
         } else {
