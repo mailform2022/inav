@@ -58,6 +58,7 @@ bool cliMode = false;
 #include "drivers/flash.h"
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
+#include "drivers/max7456.h"
 #include "drivers/pinio.h"
 #include "drivers/osd_symbols.h"
 #include "drivers/persistent.h"
@@ -3916,6 +3917,21 @@ static void cliStatus(char *cmdline)
     cliPrint("not used");
 #endif
     cliPrintLinefeed();
+
+#if defined(USE_MAX7456)
+    uint8_t osdStat, osdVm0;
+    if (max7456ReadVideoStatus(&osdStat, &osdVm0)) {
+        static const char * const syncNames[] = { "auto", "?", "external", "internal" };
+        cliPrintLinef("OSD MAX7456: STAT=0x%02X (in: %s%s%s) VM0=0x%02X (out: %s, sync: %s)",
+                osdStat,
+                (osdStat & MAX7456_STAT_LOS) ? "no sync" : "sync ok",
+                (osdStat & MAX7456_STAT_PAL) ? ", PAL" : "",
+                (osdStat & MAX7456_STAT_NTSC) ? ", NTSC" : "",
+                osdVm0,
+                (osdVm0 & MAX7456_VM0_PAL) ? "PAL" : "NTSC",
+                syncNames[(osdVm0 & MAX7456_VM0_SYNC) >> 4]);
+    }
+#endif
 
     cliPrint("VTX: ");
 #if defined(USE_VTX_CONTROL)

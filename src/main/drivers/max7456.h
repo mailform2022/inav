@@ -38,8 +38,6 @@
 #define MAX7456_BUFFER_CHARS_NTSC   (MAX7456_LINES_NTSC * MAX7456_CHARS_PER_LINE)
 #define MAX7456_BUFFER_CHARS_PAL    (MAX7456_LINES_PAL * MAX7456_CHARS_PER_LINE)
 
-enum VIDEO_TYPES { AUTO = 0, PAL, NTSC };
-
 #define MAX7456_MODE_INVERT   (1 << 3)
 #define MAX7456_MODE_BLINK    (1 << 4)
 #define MAX7456_MODE_SOLID_BG (1 << 5)
@@ -56,3 +54,13 @@ bool max7456ReadChar(uint8_t x, uint8_t y, uint16_t *c, uint8_t *mode);
 void max7456ClearScreen(void);
 void max7456RefreshAll(void);
 uint8_t* max7456GetScreenBuffer(void);
+
+// STAT tells whether the chip can see the camera at all (loss-of-sync and the
+// detected standard); VM0 is the standard the chip was told to output. A black
+// screen with the OSD still drawn means the two disagree or STAT reports LOS.
+#define MAX7456_STAT_PAL    0x01
+#define MAX7456_STAT_NTSC   0x02
+#define MAX7456_STAT_LOS    0x04
+#define MAX7456_VM0_PAL     0x40
+#define MAX7456_VM0_SYNC    0x30
+bool max7456ReadVideoStatus(uint8_t *statReg, uint8_t *vm0Reg);
