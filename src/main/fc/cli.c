@@ -73,6 +73,7 @@ bool cliMode = false;
 #include "io/vtx_control.h"
 #include "io/vtx_string.h"
 #include "io/vtx_smartaudio.h"
+#include "io/vtx_tramp.h"
 #include "drivers/light_ws2811strip.h"
 
 #include "fc/fc_core.h"
@@ -4006,6 +4007,26 @@ static void cliStatus(char *cmdline)
                     : (vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_TX3339 ? "TX3339" : "SX33"),
                 detect < ARRAYLEN(detectNames) ? detectNames[detect] : "?",
                 report->freqMin, report->freqMax, report->powerMax);
+
+#if defined(USE_VTX_TRAMP)
+        // Whole Tramp frames verbatim. The SX33 and the TX3339 both answer the
+        // capability query with the same generic 5.8GHz/600mW values, so telling
+        // them apart automatically is only possible if some byte outside the three
+        // parsed fields differs. Dump both frames so that can be settled by
+        // comparing two status logs instead of by guesswork.
+        const uint8_t * rawCaps = vtxTrampRawCapabilities();
+        const uint8_t * rawStatus = vtxTrampRawStatus();
+
+        cliPrintf("VTX 3G3 tramp raw r=[");
+        for (int i = 0; rawCaps && i < VTX_TRAMP_PKT_SIZE; i++) {
+            cliPrintf("%s%02X", (i ? " " : ""), rawCaps[i]);
+        }
+        cliPrintf("] v=[");
+        for (int i = 0; rawStatus && i < VTX_TRAMP_PKT_SIZE; i++) {
+            cliPrintf("%s%02X", (i ? " " : ""), rawStatus[i]);
+        }
+        cliPrintLinef("]");
+#endif
     }
 #endif
 #endif

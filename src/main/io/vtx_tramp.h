@@ -52,3 +52,9 @@
 
 bool vtxTrampInit(void);
 void vtxTrampDeinit(void);
+
+// Last response frames exactly as received, or NULL if none arrived yet. Used to
+// fingerprint devices whose parsed fields are identical.
+#define VTX_TRAMP_PKT_SIZE 16
+const uint8_t * vtxTrampRawCapabilities(void);
+const uint8_t * vtxTrampRawStatus(void);

@@ -120,6 +120,14 @@ typedef struct {
     uint8_t         recvPkt[VTX_PKT_SIZE];
     unsigned        recvPtr;
     serialPort_t *  port;
+
+    // Last response frames kept verbatim. The SX33 and the TX3339 answer the
+    // capability query with the same generic 5.8GHz/600mW values, so the only
+    // way to tell them apart is a byte the parser does not look at.
+    uint8_t         rawCapsPkt[VTX_PKT_SIZE];
+    uint8_t         rawStatusPkt[VTX_PKT_SIZE];
+    bool            rawCapsValid;
+    bool            rawStatusValid;
 } vtxProtoState_t;
 
 static vtxProtoState_t vtxState;
@@ -233,6 +241,9 @@ static vtxProtoResponseType_e vtxProtoProcessResponse(void)
 
     switch (respCode) {
         case 0x72:
+            memcpy(vtxState.rawCapsPkt, vtxState.recvPkt, VTX_PKT_SIZE);
+            vtxState.rawCapsValid = true;
+
             vtxState.capabilities.freqMin = vtxState.recvPkt[2] | (vtxState.recvPkt[3] << 8);
             vtxState.capabilities.freqMax = vtxState.recvPkt[4] | (vtxState.recvPkt[5] << 8);
             vtxState.capabilities.powerMax = vtxState.recvPkt[6] | (vtxState.recvPkt[7] << 8);
@@ -270,6 +281,9 @@ static vtxProtoResponseType_e vtxProtoProcessResponse(void)
             break;
 
         case 0x76:
+            memcpy(vtxState.rawStatusPkt, vtxState.recvPkt, VTX_PKT_SIZE);
+            vtxState.rawStatusValid = true;
+
             vtxState.state.freq = vtxState.recvPkt[2] | (vtxState.recvPkt[3] << 8);
             vtxState.state.power = vtxState.recvPkt[4]|(vtxState.recvPkt[5] << 8);
             vtxState.state.pitMode = vtxState.recvPkt[7];
@@ -726,6 +740,16 @@ static void vtxProtoUpdatePowerMetadata(uint16_t maxPower)
             }
             break;
     }
+}
+
+const uint8_t * vtxTrampRawCapabilities(void)
+{
+    return vtxState.rawCapsValid ? vtxState.rawCapsPkt : NULL;
+}
+
+const uint8_t * vtxTrampRawStatus(void)
+{
+    return vtxState.rawStatusValid ? vtxState.rawStatusPkt : NULL;
 }
 
 bool vtxTrampInit(void)
