@@ -92,7 +92,9 @@
 #undef USE_TELEMETRY_JETIEXBUS
 #undef USE_TELEMETRY_SRXL
 #undef USE_TELEMETRY_GHST
-#undef USE_VTX_TRAMP
+// USE_VTX_TRAMP stays enabled here: SITL exposes each UART as a TCP socket, so a
+// fake Tramp VTX can be attached to it and the 3.3GHz grid auto-detection can be
+// exercised over a real serial path.
 #undef USE_CAMERA_CONTROL
 #undef USE_BRUSHED_ESC_AUTODETECT
 #undef USE_SERIAL_4WAY_BLHELI_BOOTLOADER
