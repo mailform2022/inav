@@ -276,6 +276,9 @@ gulp.task('apps', gulp.series('dist', function(done) {
         flavor: 'normal',
         macIcns: './images/inav.icns',
         winIco: './images/inav.ico',
+        // ResourceHacker, the default icon tool, needs a Windows host; rcedit
+        // runs under Wine, which is what CI and Linux builds have.
+        useRcedit: true,
         version: get_nw_version(),
         zip: false
     });
