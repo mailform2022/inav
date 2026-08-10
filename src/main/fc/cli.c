@@ -3382,9 +3382,13 @@ static void cliGpio(char *cmdline)
         return;
     }
 
+    // "z" releases the pin instead of driving it, which is the third state a
+    // pin can be in and the one the firmware never selects by itself.
+    const bool highImpedance = (sl_tolower((unsigned char)stateStr[0]) == 'z');
     const int state = fastA2I(stateStr);
-    if (state != 0 && state != 1) {
-        cliShowArgumentRangeError("state", 0, 1);
+
+    if (!highImpedance && state != 0 && state != 1) {
+        cliPrintLine("expected state 0, 1 or z (high impedance)");
         return;
     }
 
@@ -3394,12 +3398,50 @@ static void cliGpio(char *cmdline)
         return;
     }
 
+    if (highImpedance) {
+        IOInit(io, OWNER_FREE, RESOURCE_INPUT, 0);
+        IOConfigGPIO(io, IOCFG_IN_FLOATING);
+        cliPrintLinef("P%c%d: z", portChar, pin);
+        return;
+    }
+
     IOInit(io, OWNER_FREE, RESOURCE_OUTPUT, 0);
     IOConfigGPIO(io, IOCFG_OUT_PP);
     IOWrite(io, state);
 
     cliPrintLinef("P%c%d: %d", portChar, pin, state);
 }
+
+#if defined(USE_MAX7456)
+// Tries a different sync source on the OSD chip without reflashing: "auto" is
+// the stock behaviour, "ext" forces the chip to lock onto the camera and
+// "int" makes it generate its own sync and ignore the camera.
+static void cliMax7456(char *cmdline)
+{
+    uint8_t syncMode;
+
+    if (sl_strcasecmp(cmdline, "auto") == 0) {
+        syncMode = MAX7456_SYNC_AUTO;
+    } else if (sl_strcasecmp(cmdline, "ext") == 0) {
+        syncMode = MAX7456_SYNC_EXTERNAL;
+    } else if (sl_strcasecmp(cmdline, "int") == 0) {
+        syncMode = MAX7456_SYNC_INTERNAL;
+    } else {
+        cliShowParseError();
+        return;
+    }
+
+    if (!max7456SetSyncMode(syncMode)) {
+        cliPrintLine("OSD chip not initialized");
+        return;
+    }
+
+    uint8_t statReg, vm0Reg;
+    if (max7456ReadVideoStatus(&statReg, &vm0Reg)) {
+        cliPrintLinef("OSD MAX7456: STAT=0x%02X VM0=0x%02X", statReg, vm0Reg);
+    }
+}
+#endif
 
 static void cliPlaySound(char *cmdline)
 {
@@ -4503,7 +4545,10 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("fwapproach", "Fixed Wing Approach Settings", NULL, cliFwAutolandApproach),
 #endif
     CLI_COMMAND_DEF("get", "get variable value", "[name]", cliGet),
-    CLI_COMMAND_DEF("gpio", "drive an MCU pin high/low", "<port><pin> <0|1>\r\n", cliGpio),
+    CLI_COMMAND_DEF("gpio", "drive an MCU pin high/low", "<port><pin> <0|1|z>\r\n", cliGpio),
+#if defined(USE_MAX7456)
+    CLI_COMMAND_DEF("max7456", "set the OSD chip sync source", "<auto|ext|int>\r\n", cliMax7456),
+#endif
 #ifdef USE_GPS
     CLI_COMMAND_DEF("gpspassthrough", "passthrough gps to serial", NULL, cliGpsPassthrough),
 #endif

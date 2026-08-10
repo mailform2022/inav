@@ -63,4 +63,8 @@ uint8_t* max7456GetScreenBuffer(void);
 #define MAX7456_STAT_LOS    0x04
 #define MAX7456_VM0_PAL     0x40
 #define MAX7456_VM0_SYNC    0x30
+#define MAX7456_SYNC_AUTO       0x00
+#define MAX7456_SYNC_EXTERNAL   0x20
+#define MAX7456_SYNC_INTERNAL   0x30
 bool max7456ReadVideoStatus(uint8_t *statReg, uint8_t *vm0Reg);
+bool max7456SetSyncMode(uint8_t syncMode);

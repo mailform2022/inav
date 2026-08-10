@@ -55,6 +55,7 @@
 #define SYNC_MODE_AUTO              0x00
 #define SYNC_MODE_INTERNAL          0x30
 #define SYNC_MODE_EXTERNAL          0x20
+#define SYNC_MODE_MASK              0x30
 
 #define VIDEO_MODE_PAL              0x40
 #define VIDEO_MODE_NTSC             0x00
@@ -202,6 +203,7 @@ typedef struct max7456Registers_s {
 typedef struct max7456State_s {
     busDevice_t *dev;
     videoSystem_e videoSystem;
+    uint8_t syncMode;
     bool isInitialized;
     bool mutex;
     max7456Registers_t registers;
@@ -304,6 +306,22 @@ bool max7456ReadVideoStatus(uint8_t *statReg, uint8_t *vm0Reg)
     return true;
 }
 
+// Overrides the sync source the chip uses until the next reboot, so that a
+// camera the internal detector refuses to lock onto can be tried against the
+// external and internal sync sources without reflashing.
+bool max7456SetSyncMode(uint8_t syncMode)
+{
+    if (state.dev == NULL || !state.isInitialized) {
+        return false;
+    }
+
+    state.syncMode = syncMode & SYNC_MODE_MASK;
+    state.registers.vm0 = (state.registers.vm0 & ~SYNC_MODE_MASK) | state.syncMode;
+    busWrite(state.dev, MAX7456ADD_VM0, state.registers.vm0);
+    BITARRAY_SET_ALL(screenIsDirty);
+    return true;
+}
+
 uint16_t max7456GetScreenSize(void)
 {
     // Default to PAL while the display is not yet initialized. This
@@ -346,20 +364,13 @@ static void max7456ReInit(void)
     }
 
     uint8_t vm0Mode;
-    // Automatic sync falls back to the internally generated sync - and thus a
-    // black background - as soon as the chip's own detector fails to see the
-    // camera, which happens with weak or slightly out-of-spec CVBS. Declaring
-    // the standard explicitly also means trusting the incoming sync.
-    uint8_t syncMode = SYNC_MODE_AUTO;
 
     switch (state.videoSystem) {
         case VIDEO_SYSTEM_PAL:
             vm0Mode = VIDEO_MODE_PAL;
-            syncMode = SYNC_MODE_EXTERNAL;
             break;
         case VIDEO_SYSTEM_NTSC:
             vm0Mode = VIDEO_MODE_NTSC;
-            syncMode = SYNC_MODE_EXTERNAL;
             break;
         default:
             busRead(state.dev, MAX7456ADD_STAT, &statVal);
@@ -376,7 +387,7 @@ static void max7456ReInit(void)
             }
     }
 
-    state.registers.vm0 = vm0Mode | syncMode | OSD_ENABLE;
+    state.registers.vm0 = vm0Mode | state.syncMode | OSD_ENABLE;
 
     // Enable OSD drawing and clear the display
     bufPtr = max7456PrepareBuffer(buf, sizeof(buf), bufPtr, MAX7456ADD_VM0, state.registers.vm0);
@@ -412,6 +423,7 @@ void max7456Init(const videoSystem_e videoSystem)
     // DMM defaults to all zeroes on reset
     state.registers.dmm = 0;
     state.videoSystem = videoSystem;
+    state.syncMode = SYNC_MODE_AUTO;
 
     // Set screen buffer to all blanks
     for (uint_fast16_t ii = 0; ii < ARRAYLEN(osdCharacterGridBuffer); ii++) {
