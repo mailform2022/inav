@@ -27,6 +27,9 @@
 
 #define PINIO_COUNT             4
 #define PINIO_FLAGS_INVERTED    0x80
+// Leave the pin floating while the PINIO is off instead of driving it to the
+// inactive level, for boards where the external circuit needs the pin released.
+#define PINIO_FLAGS_HIZ_IDLE    0x40
 
 typedef struct pinioHardware_s {
     ioTag_t     ioTag;

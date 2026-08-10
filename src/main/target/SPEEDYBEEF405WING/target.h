@@ -200,5 +200,9 @@
 // schematic. Measured with the CLI "gpio" command against the silkscreen:
 //   PB0 -> S3, PB10 -> S7, PA15 -> S9, PB11 -> S8, PB14 -> S11, PB15 -> S12
 // so the arming ("vzvod") high-level output must sit on PA15, not PB10.
+// Driving PC13 to either level on this airframe kills the composite input of
+// the OSD chip (STAT reports loss of sync); releasing it brings the picture
+// back, so the pin is only driven while USER1 is active.
 #define PINIO1_PIN                  PC13    // USER1 -> dual-camera video switch (C1/C2)
+#define PINIO1_FLAGS                PINIO_FLAGS_HIZ_IDLE
 #define PINIO2_PIN                  PA15    // USER2 -> S9 arming ("vzvod") high-level output

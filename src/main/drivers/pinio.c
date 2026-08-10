@@ -65,7 +65,9 @@ const int pinioHardwareCount = ARRAYLEN(pinioHardware);
 /*** Runtime configuration ***/
 typedef struct pinioRuntime_s {
     IO_t io;
+    ioConfig_t ioMode;
     bool inverted;
+    bool hizIdle;
     bool state;
 } pinioRuntime_t;
 
@@ -84,15 +86,17 @@ void pinioInit(void)
             continue;
         }
 
-        IOInit(io, OWNER_PINIO, RESOURCE_OUTPUT, RESOURCE_INDEX(i));
-        IOConfigGPIO(io, pinioHardware[i].ioMode);
+        pinioRuntime[i].inverted = (pinioHardware[i].flags & PINIO_FLAGS_INVERTED) != 0;
+        pinioRuntime[i].hizIdle = (pinioHardware[i].flags & PINIO_FLAGS_HIZ_IDLE) != 0;
+        pinioRuntime[i].ioMode = pinioHardware[i].ioMode;
 
-        if (pinioHardware[i].flags & PINIO_FLAGS_INVERTED) {
-            pinioRuntime[i].inverted = true;
-            IOHi(io);
+        if (pinioRuntime[i].hizIdle) {
+            IOInit(io, OWNER_PINIO, RESOURCE_INPUT, RESOURCE_INDEX(i));
+            IOConfigGPIO(io, IOCFG_IN_FLOATING);
         } else {
-            pinioRuntime[i].inverted = false;
-            IOLo(io);
+            IOInit(io, OWNER_PINIO, RESOURCE_OUTPUT, RESOURCE_INDEX(i));
+            IOConfigGPIO(io, pinioHardware[i].ioMode);
+            IOWrite(io, pinioRuntime[i].inverted);
         }
 
         pinioRuntime[i].io = io;
@@ -108,9 +112,23 @@ void pinioSet(int index, bool on)
         return;
     }
 
-    if (newState != pinioRuntime[index].state) {
-        IOWrite(pinioRuntime[index].io, newState);
-        pinioRuntime[index].state = newState;
+    if (newState == pinioRuntime[index].state) {
+        return;
     }
+
+    if (pinioRuntime[index].hizIdle) {
+        // "off" means released rather than driven, so the pin swaps direction
+        // instead of just changing level.
+        if (on) {
+            IOConfigGPIO(pinioRuntime[index].io, pinioRuntime[index].ioMode);
+            IOWrite(pinioRuntime[index].io, newState);
+        } else {
+            IOConfigGPIO(pinioRuntime[index].io, IOCFG_IN_FLOATING);
+        }
+    } else {
+        IOWrite(pinioRuntime[index].io, newState);
+    }
+
+    pinioRuntime[index].state = newState;
 }
 #endif
