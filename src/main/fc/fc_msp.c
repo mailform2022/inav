@@ -1470,6 +1470,10 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
                 sbufWriteU16(dst, report->freqMin);
                 sbufWriteU16(dst, report->freqMax);
                 sbufWriteU16(dst, report->powerMax);
+                // Grid geometry, so the configurator encodes the flat band/channel
+                // index with the same stride the FC decodes it with.
+                sbufWriteU8(dst, vtx3G3_BandCount());
+                sbufWriteU8(dst, vtx3G3_ChannelCount());
             }
             else {
                 sbufWriteU8(dst, VTXDEV_UNKNOWN); // no VTX configured
@@ -2612,8 +2616,17 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
                 if (vtxCommonGetDeviceType(vtxDevice) != VTXDEV_UNKNOWN) {
                     uint16_t newFrequency = sbufReadU16(src);
                     if (newFrequency <= VTXCOMMON_MSP_BANDCHAN_CHKVAL) {  //value is band and channel
-                        const uint8_t newBand = (newFrequency / 8) + 1;
-                        const uint8_t newChannel = (newFrequency % 8) + 1;
+                        // The band/channel pair travels as a flat index, which
+                        // assumes 8 channels per band. The 3.3GHz FF3.7 has one
+                        // band of 20, so the stride follows the active grid.
+                        uint8_t chansPerBand = 8;
+#if defined(USE_VTX_COMMON)
+                        if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+                            chansPerBand = vtx3G3_ChannelCount();
+                        }
+#endif
+                        const uint8_t newBand = (newFrequency / chansPerBand) + 1;
+                        const uint8_t newChannel = (newFrequency % chansPerBand) + 1;
 
                         if(vtxSettingsConfig()->band != newBand || vtxSettingsConfig()->channel != newChannel) {
                             vtxCommonSetBandAndChannel(vtxDevice, newBand, newChannel);
