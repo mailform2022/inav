@@ -177,11 +177,9 @@ uint8_t sa3G3Power = 0;
 uint8_t sa3G3LastChanBuf[8] = { 0 };
 uint8_t sa3G3LastChanLen = 0;
 
-// 3G3 grid power levels are 25 mW / 2 W / 5 W (see vtx3G3DefaultPowerNames).
-// The FF3741 advertises a bogus SmartAudio power table, so we ignore the
-// device table and command power by absolute dBm (V2.1) computed from these
-// real grid levels. Index 1..3 maps to {14, 33, 37} dBm (= 25 mW, 2 W, 5 W).
-static const uint8_t sa3G3PowerDbm[3] = { 14, 33, 37 };
+// The FF3741 advertises a bogus SmartAudio power table, so we ignore the device
+// table and command power by absolute dBm (V2.1) taken from the selected 3.3GHz
+// grid (25 mW / 2 W / 5 W => 14 / 33 / 37 dBm on the SX33 and FF3.7 grids).
 
 // XXX Possible compliance problem here. Need LOCK/UNLOCK menu?
 static uint8_t saLockMode = SA_MODE_SET_UNLOCK; // saCms variable?
@@ -310,6 +308,22 @@ static uint8_t sa_outstanding = SA_CMD_NONE; // Outstanding command
 static uint8_t sa_osbuf[32]; // Outstanding comamnd frame for retransmission
 static int sa_oslen;         // And associate length
 
+// The 3.3GHz grids differ in shape (5x8, 4x8, 2x8, 1x20) and in how many power
+// levels they expose, so what the device advertises is replaced by the grid.
+static void sa3G3UpdateCapabilities(void)
+{
+    if (vtxSettingsConfig()->frequencyGroup != FREQUENCYGROUP_3G3) {
+        return;
+    }
+
+    vtxSmartAudio.capability.bandCount = vtx3G3_BandCount();
+    vtxSmartAudio.capability.channelCount = vtx3G3_ChannelCount();
+    vtxSmartAudio.capability.powerCount = vtx3G3_PowerCount();
+    vtxSmartAudio.capability.bandNames = (char **)vtx3G3_BandNames();
+    vtxSmartAudio.capability.channelNames = (char **)vtx3G3_ChannelNames();
+    vtxSmartAudio.capability.powerNames = (char **)vtx3G3_PowerNames();
+}
+
 static void saProcessResponse(uint8_t *buf, int len)
 {
     uint8_t resp = buf[0];
@@ -335,9 +349,10 @@ static void saProcessResponse(uint8_t *buf, int len)
         // saDevice.version = 0 means unknown, 1 means Smart audio V1, 2 means Smart audio V2 and 3 means Smart audio V2.1
         saDevice.version = (buf[0] == SA_CMD_GET_SETTINGS) ? 1 : ((buf[0] == SA_CMD_GET_SETTINGS_V2) ? 2 : 3);
 
-        // A 3.3GHz VTX answering SmartAudio is an FF3741, which uses the SX33 grid.
-        // The TX3339 speaks IRC Tramp only, so the protocol settles the grid here.
+        // A 3.3GHz VTX answering SmartAudio is an FF3741 or an FF3.7; the IRC
+        // Tramp devices are ruled out, but the two SmartAudio ones answer alike.
         vtx3G3_ReportSmartAudioDevice();
+        sa3G3UpdateCapabilities();
 
         saDevice.channel = buf[2];
         uint8_t rawPowerValue = buf[3];
@@ -367,9 +382,9 @@ static void saProcessResponse(uint8_t *buf, int len)
             vtxSmartAudio.capability.powerCount = saPowerCount;
             if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
                 // FF3741 reports a bogus power table (e.g. 2 levels); expose the
-                // 3.3 GHz grid's 3 levels (25 mW / 2 W / 5 W) instead so the top
-                // level (5 W) can be selected and commanded.
-                vtxSmartAudio.capability.powerCount = 3;
+                // selected 3.3 GHz grid's levels instead so the top level can be
+                // selected and commanded.
+                sa3G3UpdateCapabilities();
             }
             //SmartAudio seems to report buf[8] + 1 power levels, but one of them is zero.
             //zero is indeed a valid power level to set the vtx to, but it activates pit mode.
@@ -691,6 +706,12 @@ void saSetPitFreq(uint16_t freq)
 
 static bool saValidateBandAndChannel(uint8_t band, uint8_t channel)
 {
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // 3.3GHz grids are not all 5x8 - the FF3.7 is one row of 20 channels.
+        return (band >= 1 && band <= vtx3G3_BandCount() &&
+                channel >= 1 && channel <= vtx3G3_ChannelCount());
+    }
+
     return (band >= VTX_SMARTAUDIO_MIN_BAND && band <= VTX_SMARTAUDIO_MAX_BAND &&
             channel >= VTX_SMARTAUDIO_MIN_CHANNEL && channel <= VTX_SMARTAUDIO_MAX_CHANNEL);
 }
@@ -758,6 +779,7 @@ bool vtxSmartAudioInit(void)
 
     saDevice.version = SA_UNKNOWN;
     saInitPhase = SA_INITPHASE_START;
+    sa3G3UpdateCapabilities();
     vtxCommonSetDevice(&vtxSmartAudio);
 
     return true;
@@ -1098,16 +1120,16 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
             buf[4] = index - 1;                       // V2.0: power by level index
             break;
         case VTX_3G3_POWER_RAW_DBM:
-            buf[4] = sa3G3PowerDbm[index - 1];        // dBm, no MSB flag
+            buf[4] = vtx3G3_PowerDbm(index);          // dBm, no MSB flag
             break;
         case VTX_3G3_POWER_FIXED_DBM:
-            buf[4] = sa3G3PowerDbm[index - 1] | 128;  // fixed grid dBm, V2.1 MSB
+            buf[4] = vtx3G3_PowerDbm(index) | 128;    // fixed grid dBm, V2.1 MSB
             break;
         case VTX_3G3_POWER_AUTO:
         default: {
             // Use the dBm the VTX advertised; map our 3 grid levels onto the
             // device's reported levels (min / middle / max).
-            uint8_t dbi = sa3G3PowerDbm[index - 1];   // fallback to grid dBm
+            uint8_t dbi = vtx3G3_PowerDbm(index);     // fallback to grid dBm
             if (saPowerCount > 0) {
                 uint8_t devIdx;
                 if (index == 1) {
@@ -1270,12 +1292,11 @@ static bool vtxSAGetFreq(const vtxDevice_t *vtxDevice, uint16_t *pFreq)
     }
 
     if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
-        // Report the grid frequency from the VTX's real band/channel read-back
-        // (the VTX maps the channel index to this frequency via its own SX33
-        // table). Display only; not used to drive the VTX.
-        *pFreq = vtx3G3_Bandchan2Freq(
-            SA_DEVICE_CHVAL_TO_BAND(saDevice.channel) + 1,
-            SA_DEVICE_CHVAL_TO_CHANNEL(saDevice.channel) + 1);
+        // Report the grid frequency of the band/channel last commanded. The
+        // device read-back cannot be used: its channel value is a flat index
+        // that only splits into 5x8 band/channel pairs, which is wrong for a
+        // grid like the FF3.7. Display only; not used to drive the VTX.
+        *pFreq = vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel);
         return true;
     }
 
@@ -1325,9 +1346,9 @@ static bool vtxSAGetOsdInfo(const  vtxDevice_t *vtxDevice, vtxDeviceOsdInfo_t * 
     pOsdInfo->frequency = freq;
     pOsdInfo->powerIndex = powerIndex;
     pOsdInfo->powerMilliwatt = powerMw;
-    pOsdInfo->bandLetter = is3G3 ? vtx3G3BandNames[band][0] : vtx58BandNames[band][0];
-    pOsdInfo->bandName = is3G3 ? vtx3G3BandNames[band] : vtx58BandNames[band];
-    pOsdInfo->channelName = is3G3 ? vtx3G3ChannelNames[channel] : vtx58ChannelNames[channel];
+    pOsdInfo->bandLetter = is3G3 ? vtx3G3_BandNames()[band][0] : vtx58BandNames[band][0];
+    pOsdInfo->bandName = is3G3 ? vtx3G3_BandNames()[band] : vtx58BandNames[band];
+    pOsdInfo->channelName = is3G3 ? vtx3G3_ChannelNames()[channel] : vtx58ChannelNames[channel];
     pOsdInfo->powerIndexLetter = '0' + powerIndex;
     return true;
 }

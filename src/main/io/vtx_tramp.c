@@ -495,9 +495,12 @@ static void impl_SetPowerByIndex(vtxDevice_t * vtxDevice, uint8_t index)
     // Value actually transmitted to the VTX. Standard Tramp expects mW, but the
     // SX33 (3.3 GHz) uses its own device-scale codes and ignores real mW or an
     // index. Its three levels (25/200/5000 mW) map to codes 25/100/600 (it
-    // reports 0 for the lowest, but a 0 set-command means pit/off). Map 3G3
-    // power to those device codes; all other groups send mW unchanged.
-    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+    // reports 0 for the lowest, but a 0 set-command means pit/off). Map those
+    // 3G3 grids to the device codes; grids that speak plain Tramp mW, and all
+    // other frequency groups, send mW unchanged.
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 &&
+        index <= ARRAYLEN(vtxConfig()->vtx3g3TrampPwrCode) &&
+        !vtx3G3_TrampPowerIsMilliwatt()) {
         // Device-scale codes are CLI-tunable (vtx_3g3_tramp_pwr1/2/3) because
         // some SX33 units do not reach true max output with the default code.
         vtxState.request.devicePower = vtxConfig()->vtx3g3TrampPwrCode[index - 1];
@@ -590,9 +593,9 @@ static bool impl_GetOsdInfo(const  vtxDevice_t *vtxDevice, vtxDeviceOsdInfo_t * 
             pOsdInfo->channelName = vtx1G3ChannelNames[vtxState.request.channel];
             break;
         case FREQUENCYGROUP_3G3:
-            pOsdInfo->bandLetter = vtx3G3BandNames[vtxState.request.band][0];
-            pOsdInfo->bandName = vtx3G3BandNames[vtxState.request.band];
-            pOsdInfo->channelName = vtx3G3ChannelNames[vtxState.request.channel];
+            pOsdInfo->bandLetter = vtx3G3_BandNames()[vtxState.request.band][0];
+            pOsdInfo->bandName = vtx3G3_BandNames()[vtxState.request.band];
+            pOsdInfo->channelName = vtx3G3_ChannelNames()[vtxState.request.channel];
             break;
         default:
             pOsdInfo->bandLetter = vtx58BandNames[vtxState.request.band][0];
@@ -649,33 +652,21 @@ const char * const trampPowerNames_1G3_800[VTX_TRAMP_1G3_MAX_POWER_COUNT + 1] = 
 const uint16_t trampPowerTable_1G3_2000[VTX_TRAMP_1G3_MAX_POWER_COUNT]         = { 25, 200, 2000 };
 const char * const trampPowerNames_1G3_2000[VTX_TRAMP_1G3_MAX_POWER_COUNT + 1] = { "---", "25 ", "200", "2000" };
 
-const uint16_t trampPowerTable_3G3[VTX_TRAMP_3G3_MAX_POWER_COUNT]              = { 25, 200, 5000 };
-const char * const trampPowerNames_3G3[VTX_TRAMP_3G3_MAX_POWER_COUNT + 1]      = { "---", "25 ", "200", "5W " };
-
-// BeastFPV TX3339-32CH: 25 mW / 3 W / 10 W. The wire values are still the
-// device-scale codes from vtx_3g3_tramp_pwr1..3 (25/100/600 by default, which
-// is what this VTX expects); this table only carries the real levels.
-const uint16_t trampPowerTable_3G3_TX3339[VTX_TRAMP_3G3_MAX_POWER_COUNT]         = { 25, 3000, 10000 };
-const char * const trampPowerNames_3G3_TX3339[VTX_TRAMP_3G3_MAX_POWER_COUNT + 1] = { "---", "25 ", "3W ", "10W" };
-
 static void vtxProtoUpdatePowerMetadata(uint16_t maxPower)
 {
     switch (vtxSettingsConfig()->frequencyGroup) {
         case FREQUENCYGROUP_3G3:
-            if (vtx3G3_GridIsTx3339()) {
-                vtxState.metadata.powerTablePtr = trampPowerTable_3G3_TX3339;
-                impl_vtxDevice.capability.powerNames = (char **)trampPowerNames_3G3_TX3339;
-            } else {
-                vtxState.metadata.powerTablePtr = trampPowerTable_3G3;
-                impl_vtxDevice.capability.powerNames = (char **)trampPowerNames_3G3;
-            }
-            vtxState.metadata.powerTableCount = VTX_TRAMP_3G3_MAX_POWER_COUNT;
+            // Band/channel/power layout is a property of the selected 3.3GHz
+            // grid, not of the Tramp protocol, so it all comes from one place.
+            vtxState.metadata.powerTablePtr = vtx3G3_PowerLevels();
+            vtxState.metadata.powerTableCount = vtx3G3_PowerCount();
 
-            impl_vtxDevice.capability.powerCount = VTX_TRAMP_3G3_MAX_POWER_COUNT;
+            impl_vtxDevice.capability.powerNames = (char **)vtx3G3_PowerNames();
+            impl_vtxDevice.capability.powerCount = vtx3G3_PowerCount();
             impl_vtxDevice.capability.bandCount = vtx3G3_BandCount();
-            impl_vtxDevice.capability.channelCount = VTX_TRAMP_3G3_CHANNEL_COUNT;
-            impl_vtxDevice.capability.bandNames = (char **)vtx3G3BandNames;
-            impl_vtxDevice.capability.channelNames = (char **)vtx3G3ChannelNames;
+            impl_vtxDevice.capability.channelCount = vtx3G3_ChannelCount();
+            impl_vtxDevice.capability.bandNames = (char **)vtx3G3_BandNames();
+            impl_vtxDevice.capability.channelNames = (char **)vtx3G3_ChannelNames();
             break;
         case FREQUENCYGROUP_1G3:
             if (maxPower >= 2000) {

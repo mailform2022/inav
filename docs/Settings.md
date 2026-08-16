@@ -6154,7 +6154,7 @@ On the 3.3GHz (FF3741) grid, clear pit mode and force channel mode when applying
 
 ### vtx_3g3_grid
 
-Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. AUTO (default): identify the VTX from what it reports - a SmartAudio device is an FF3741 (SX33 grid), an IRC Tramp device is classified by the frequency range and max power it answers with, and anything unrecognised falls back to SX33. SX33: force the SX33/FF3741 grid, 5 bands A-E over 3200-3700MHz, 25mW/2W/5W. TX3339: force the BeastFPV TX3339-32CH grid, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range. 'status' shows the grid in use and how it was chosen.
+Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. AUTO (default): identify the VTX from what it reports - an IRC Tramp device is classified by the frequency range and max power it answers with (only the TX3339 and NONAME1 answer distinctively), a SmartAudio device is reported as SX33, and anything unrecognised falls back to SX33. SX33: 5 bands A-E over 3200-3700MHz, 25mW/2W/5W (also the FF3741). TX3339: BeastFPV TX3339-32CH, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. NONAME1: 3W IRC Tramp unit, 2 bands over 3200-3500MHz, 25mW/400mW/1W/3W. FF37: FF3.7 SmartAudio unit, one band of 20 channels over 3700-4080MHz, 25mW/2W/5W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range; the FF3741 and FF3.7 answer SmartAudio identically and cannot be told apart automatically. 'status' shows the grid in use and how it was chosen.
 
 | Default | Min | Max |
 | --- | --- | --- |
@@ -6194,7 +6194,7 @@ How RF power is commanded on the 3.3GHz (FF3741/SX33) grid. FIXED_DBM (default):
 
 ### vtx_3g3_tramp_pwr1
 
-IRC Tramp 3.3GHz (SX33) device power code for the lowest grid level (25mW). The SX33 uses its own scale codes rather than real mW; adjust only if a particular unit does not reach the expected output. Default 25.
+IRC Tramp 3.3GHz (SX33/TX3339) device power code for the lowest grid level (25mW). These units use their own scale codes rather than real mW; adjust only if a particular unit does not reach the expected output. Not used by the NONAME1 grid, which is commanded in real mW. Default 25.
 
 | Default | Min | Max |
 | --- | --- | --- |
@@ -6234,11 +6234,11 @@ Configure the VTX band. Bands: 1: A, 2: B, 3: E, 4: F, 5: Race.
 
 ### vtx_channel
 
-Channel to use within the configured `vtx_band`. Valid values are [1, 8].
+Channel to use within the configured `vtx_band`. Valid values are [1, 8] on every grid except the 3.3GHz FF3.7, which has a single band of 20 channels.
 
 | Default | Min | Max |
 | --- | --- | --- |
-| 1 | VTX_SETTINGS_MIN_CHANNEL | VTX_SETTINGS_MAX_CHANNEL |
+| 1 | VTX_SETTINGS_MIN_CHANNEL | VTX_SETTINGS_MAX_CHANNEL_ANY |
 
 ---
 

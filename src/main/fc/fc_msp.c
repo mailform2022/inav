@@ -1464,8 +1464,8 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
                 // instead of whatever was last loaded from a JSON file.
                 const vtx3G3DeviceReport_t *report = vtx3G3_DeviceReport();
                 sbufWriteU8(dst, vtxSettingsConfig()->frequencyGroup);
-                sbufWriteU8(dst, vtxConfig()->vtx3g3Grid);                                      // configured: SX33/TX3339/AUTO
-                sbufWriteU8(dst, vtx3G3_GridIsTx3339() ? VTX_3G3_GRID_TX3339 : VTX_3G3_GRID_SX33); // effective
+                sbufWriteU8(dst, vtxConfig()->vtx3g3Grid);   // configured, incl. AUTO
+                sbufWriteU8(dst, vtx3G3_EffectiveGrid());    // resolved, never AUTO
                 sbufWriteU8(dst, vtx3G3_DetectSource());
                 sbufWriteU16(dst, report->freqMin);
                 sbufWriteU16(dst, report->freqMax);

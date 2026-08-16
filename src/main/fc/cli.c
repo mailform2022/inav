@@ -4054,15 +4054,19 @@ static void cliStatus(char *cmdline)
         const vtx3G3DeviceReport_t * report = vtx3G3_DeviceReport();
         const uint8_t detect = vtx3G3_DetectSource();
 
-        cliPrintLinef("VTX 3G3 grid: %s bands=%d range=%d-%dMHz selFreq=%d",
-                vtx3G3_GridIsTx3339() ? "TX3339" : "SX33",
-                vtx3G3_BandCount(), vtx3G3_FreqMin(), vtx3G3_FreqMax(),
+        static const char * const gridNames[] = {
+            "SX33", "TX3339", "AUTO", "NONAME1", "FF37"
+        };
+        const uint8_t configuredGrid = vtxConfig()->vtx3g3Grid;
+
+        cliPrintLinef("VTX 3G3 grid: %s bands=%dx%d range=%d-%dMHz selFreq=%d",
+                vtx3G3_GridName(), vtx3G3_BandCount(), vtx3G3_ChannelCount(),
+                vtx3G3_FreqMin(), vtx3G3_FreqMax(),
                 vtx3G3_Bandchan2Freq(vtxSettingsConfig()->band, vtxSettingsConfig()->channel));
         // Raw device answer, before the 3G3 overrides rewrite it - this is what the
         // AUTO classifier sees, so a misdetection can be diagnosed from a status dump.
         cliPrintLinef("VTX 3G3 detect: setting=%s via=%s devReported=%d-%dMHz/%dmW",
-                (vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_AUTO) ? "AUTO"
-                    : (vtxConfig()->vtx3g3Grid == VTX_3G3_GRID_TX3339 ? "TX3339" : "SX33"),
+                configuredGrid < ARRAYLEN(gridNames) ? gridNames[configuredGrid] : "?",
                 detect < ARRAYLEN(detectNames) ? detectNames[detect] : "?",
                 report->freqMin, report->freqMax, report->powerMax);
 

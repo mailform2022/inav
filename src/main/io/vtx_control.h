@@ -42,10 +42,15 @@ typedef enum {
     VTX_3G3_CHAN_NONE,         // Never command band/channel; leave what the buttons set
 } vtx3g3ChannelMode_e;
 
+/* Values are persisted in the config, so new grids are appended rather than
+ * inserted in a tidier order. */
 typedef enum {
     VTX_3G3_GRID_SX33 = 0,     // SX33 / FF3741: 5 bands A-E, 3200-3700 MHz, 25mW/2W/5W
     VTX_3G3_GRID_TX3339,       // BeastFPV TX3339-32CH: 4 bands A-D, 3060-3480 MHz, 25mW/3W/10W
     VTX_3G3_GRID_AUTO,         // Pick from what the attached VTX reports, SX33 if it says nothing useful
+    VTX_3G3_GRID_NONAME1,      // "Noname_1" 3W IRC Tramp: 2 bands, 3200-3500 MHz, 25mW/400mW/1W/3W
+    VTX_3G3_GRID_FF37,         // "FF3.7" SmartAudio: 1 band of 20 channels, 3700-4080 MHz
+    VTX_3G3_GRID_COUNT,
 } vtx3g3Grid_e;
 
 /* How the active 3.3GHz grid was arrived at, reported over CLI and MSP so a wrong
