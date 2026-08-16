@@ -1234,6 +1234,14 @@ var mspHelper = (function (gui) {
                         VTX.fcGrid.freqMax = data.getUint16(offset, true); offset += 2;
                         VTX.fcGrid.powerMax = data.getUint16(offset, true); offset += 2;
                         VTX.fcGrid.valid = true;
+                        // Grid geometry is a later addition; older builds stop above.
+                        if (data.byteLength >= offset + 2) {
+                            VTX.fcGrid.bandCount = data.getUint8(offset++);
+                            VTX.fcGrid.chanCount = data.getUint8(offset++);
+                        } else {
+                            VTX.fcGrid.bandCount = 0;
+                            VTX.fcGrid.chanCount = 0;
+                        }
                     }
                 }
                 break;
@@ -1776,7 +1784,11 @@ var mspHelper = (function (gui) {
 
             case MSPCodes.MSP_SET_VTX_CONFIG:
                 if (VTX_CONFIG.band > 0) {
-                    buffer.push16(((VTX_CONFIG.band - 1) * 8) + (VTX_CONFIG.channel - 1));
+                    // Flat band/channel index. The stride is the active grid's
+                    // channel count, not a fixed 8, so a 1x20 grid can address
+                    // every channel; the FC decodes it the same way.
+                    var chansPerBand = VTX.fcGrid.chanCount || 8;
+                    buffer.push16(((VTX_CONFIG.band - 1) * chansPerBand) + (VTX_CONFIG.channel - 1));
                 } else {
                     // This tells the firmware to ignore this value.
                     buffer.push16(VTX.MAX_FREQUENCY_MHZ + 1);

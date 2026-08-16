@@ -45,6 +45,8 @@ var VTX = (function() {
     self.GRID_SX33 = 0;
     self.GRID_TX3339 = 1;
     self.GRID_AUTO = 2;
+    self.GRID_NONAME1 = 3;
+    self.GRID_FF37 = 4;
 
     self.DETECT_NAMES = ['none', 'forced', 'range', 'power', 'protocol', 'fallback'];
 
@@ -72,6 +74,30 @@ var VTX = (function() {
         powerLevels: [25, 3000, 10000],
         powerLabels: ['25 mW', '3 W', '10 W'],
     };
+    self.BUILTIN_3G3_GRIDS[self.GRID_NONAME1] = {
+        name: 'Noname_1 3.3GHz 3W',
+        bands_list: [
+            { name: 'A 3200-3340', frequencies: [3200, 3220, 3240, 3260, 3280, 3300, 3320, 3340] },
+            { name: 'B 3360-3500', frequencies: [3360, 3380, 3400, 3420, 3440, 3460, 3480, 3500] },
+        ],
+        powerLevels: [25, 400, 1000, 3000],
+        powerLabels: ['25 mW', '400 mW', '1 W', '3 W'],
+    };
+    /* FF3.7: a single flat row of 20 channels. The device labels the last four
+     * with non-ASCII glyphs; they are spelled G/U/P/H in device order, matching
+     * the firmware's channel names. */
+    self.BUILTIN_3G3_GRIDS[self.GRID_FF37] = {
+        name: 'FF3.7 3.7-4.08GHz',
+        bands_list: [
+            { name: 'A 3700-4080', frequencies: [
+                3700, 3720, 3740, 3760, 3780, 3800, 3820, 3840, 3860, 3880,
+                3900, 3920, 3940, 3960, 3980, 4000, 4020, 4040, 4060, 4080] },
+        ],
+        channelLabels: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'U', 'P', 'H'],
+        powerLevels: [25, 2000, 5000],
+        powerLabels: ['25 mW', '2 W', '5 W'],
+    };
 
     /* What the FC last reported over MSP_VTX_CONFIG: which grid it is really using
      * and how it decided. Filled by MSPHelper, so the dropdown shows the FC's own
@@ -85,6 +111,8 @@ var VTX = (function() {
         freqMin: 0,
         freqMax: 0,
         powerMax: 0,
+        bandCount: 0,
+        chanCount: 0,     // stride for the flat band/channel index sent over MSP
     };
 
     self.fcIs3G3 = function () {
@@ -113,6 +141,8 @@ var VTX = (function() {
 
     self.FREQ_MIN_MHZ = 100;
     self.FREQ_MAX_MHZ = 6000;
+    /* Widest channel row the firmware accepts (FF3.7's single 20-channel band). */
+    self.CHANNEL_MAX_ANY = 20;
     self.POWER_MAX_MW = 10000;
 
     self.normalizeGrid = function (raw) {
@@ -134,8 +164,8 @@ var VTX = (function() {
         for (var i = 0; i < rawBands.length; i++) {
             var b = rawBands[i];
             var freqs = b ? b.frequencies : null;
-            if (!Array.isArray(freqs) || freqs.length < 1 || freqs.length > 8) {
-                throw new Error('Band ' + (i + 1) + ': "frequencies" must be an array of 1..8 channels');
+            if (!Array.isArray(freqs) || freqs.length < 1 || freqs.length > self.CHANNEL_MAX_ANY) {
+                throw new Error('Band ' + (i + 1) + ': "frequencies" must be an array of 1..' + self.CHANNEL_MAX_ANY + ' channels');
             }
             if (channelCount === null) {
                 channelCount = freqs.length;
@@ -173,7 +203,14 @@ var VTX = (function() {
             powerLabels.push(lbl);
         }
 
+        var channelLabels = null;
+        var rawLabels = src.channelLabels || src.channel_labels;
+        if (Array.isArray(rawLabels) && rawLabels.length === channelCount) {
+            channelLabels = rawLabels.map(String);
+        }
+
         return {
+            channelLabels: channelLabels,
             name: (raw.name || src.name) ? String(raw.name || src.name) : 'Custom VTX Grid',
             protocol: (raw.protocol || src.protocol) ? String(raw.protocol || src.protocol) : '',
             bands_list: bands,
@@ -230,6 +267,16 @@ var VTX = (function() {
         return self.CHANNEL_MAX;
     };
 
+    /* Channel label as the pilot sees it on the VTX itself; grids without their
+     * own labelling just use the 1-based index. */
+    self.getChannelLabel = function (channel) {
+        var grid = self.getActiveGrid();
+        if (grid && grid.channelLabels && grid.channelLabels[channel - 1] != null) {
+            return grid.channelLabels[channel - 1];
+        }
+        return String(channel);
+    };
+
     self.getFrequency = function (band, channel) {
         var grid = self.getActiveGrid();
         if (grid) {
@@ -254,9 +301,9 @@ var VTX = (function() {
         var activeGrid = self.getActiveGrid();
         var refBand = activeGrid ? activeGrid.bands_list[0] : null;
         for (var i = 1; i <= count; i++) {
-            var label = 'CH ' + i;
+            var label = 'CH ' + self.getChannelLabel(i);
             if (refBand && refBand.frequencies[i - 1] != null) {
-                label = 'CH ' + i + ' (' + refBand.frequencies[i - 1] + ' MHz)';
+                label += ' (' + refBand.frequencies[i - 1] + ' MHz)';
             }
             list.push({ value: i, label: label });
         }
