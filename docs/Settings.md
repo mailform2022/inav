@@ -6288,7 +6288,7 @@ _// TODO_
 
 | Default | Min | Max |
 | --- | --- | --- |
-| 1 | VTX_SETTINGS_MIN_CHANNEL | VTX_SETTINGS_MAX_CHANNEL |
+| 1 | VTX_SETTINGS_MIN_CHANNEL | VTX_SETTINGS_MAX_CHANNEL_ANY |
 
 ---
 

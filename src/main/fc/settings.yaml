@@ -3939,7 +3939,7 @@ groups:
       - name: vtx_pit_mode_chan
         field: pitModeChan
         min: VTX_SETTINGS_MIN_CHANNEL
-        max: VTX_SETTINGS_MAX_CHANNEL
+        max: VTX_SETTINGS_MAX_CHANNEL_ANY
         default_value: 1
       - name: vtx_max_power_override
         description:  "Some VTXes may report max power incorrectly (i.e. 200mW for a 600mW VTX). Use this to override max supported power. 0 to disable and use whatever VTX reports as its capabilities"
