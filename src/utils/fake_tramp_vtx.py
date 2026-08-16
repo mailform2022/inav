@@ -9,6 +9,7 @@ serial path instead of by calling the classifier directly.
 Profiles:
   sx33     - what the SX33/FF3741 actually answers: generic 5.8GHz/600mW
   tx3339   - an honest answer for the 3.3GHz grid
+  noname1  - what the Noname_1 answers on the bench: 850-5999MHz/1600mW
   mute     - never answers
 """
 import argparse
@@ -21,6 +22,8 @@ PROFILES = {
     # freqMin, freqMax, powerMax, extra bytes 8..13 of the 'r' frame
     "sx33": (5100, 6000, 600, bytes([0, 0, 0, 0, 0, 0])),
     "tx3339": (3060, 3480, 10000, bytes([0, 0, 0, 0, 0, 0])),
+    # Captured from the real unit: r=[0F 72 52 03 6F 17 40 06 ...]
+    "noname1": (850, 5999, 1600, bytes([0, 0, 0, 0, 0, 0])),
 }
 
 
@@ -46,7 +49,7 @@ def main():
 
     # A status frame of all zeroes is byte-identical to the query frame, and the
     # driver drops those as half-duplex echoes, so start from a plausible state.
-    state_freq = 3330 if args.profile == "tx3339" else 5800
+    state_freq = 3330 if args.profile == "tx3339" else (3200 if args.profile == "noname1" else 5800)
     state_power = 25
     deadline = time.time() + args.seconds
     buf = bytearray()
