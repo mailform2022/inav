@@ -122,6 +122,8 @@ TABS.configuration.initialize = function (callback, scrollPosition) {
         VTX_GRID_LABELS[VTX.GRID_AUTO] = 'configurationVTXGridTypeAuto';
         VTX_GRID_LABELS[VTX.GRID_SX33] = 'configurationVTXGridTypeSX33';
         VTX_GRID_LABELS[VTX.GRID_TX3339] = 'configurationVTXGridTypeTX3339';
+        VTX_GRID_LABELS[VTX.GRID_NONAME1] = 'configurationVTXGridTypeNoname1';
+        VTX_GRID_LABELS[VTX.GRID_FF37] = 'configurationVTXGridTypeFF37';
 
         function renderVtxGridType() {
             var $wrapper = $('#vtx_grid_type_wrapper');
@@ -230,10 +232,10 @@ TABS.configuration.initialize = function (callback, scrollPosition) {
             vtx_channel.empty();
             var channelCount = VTX.getChannelCount();
             for (var ci = VTX.CHANNEL_MIN; ci <= channelCount; ci++) {
-                var chLabel = String(ci);
+                var chLabel = VTX.getChannelLabel(ci);
                 var freq = VTX.getFrequency(VTX_CONFIG.band, ci);
                 if (freq != null) {
-                    chLabel = ci + ' (' + freq + ' MHz)';
+                    chLabel += ' (' + freq + ' MHz)';
                 }
                 var option = $('<option value="' + ci + '">' + chLabel + '</option>');
                 if (ci == VTX_CONFIG.channel) {
@@ -247,7 +249,7 @@ TABS.configuration.initialize = function (callback, scrollPosition) {
 
             var vtx_power = $('#vtx_power');
             vtx_power.empty();
-            if (VTX.hasCustomGrid()) {
+            if (VTX.getActiveGrid()) {
                 var powerList = VTX.getProgrammingPowerList();
                 for (var pi = 0; pi < powerList.length; pi++) {
                     var pOption = $('<option value="' + powerList[pi].value + '">' + powerList[pi].label + '</option>');

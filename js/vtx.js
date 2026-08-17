@@ -248,6 +248,13 @@ var VTX = (function() {
         }
     };
 
+    /* Name of the grid the lists below come from, for places that only show
+     * numbers (Programming) and would otherwise be ambiguous. */
+    self.getActiveGridName = function () {
+        var grid = self.getActiveGrid();
+        return grid ? grid.name : null;
+    };
+
     /* Bands as {code, name} for the Configuration dropdown. */
     self.getBands = function () {
         var grid = self.getActiveGrid();

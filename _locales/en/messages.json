@@ -1192,7 +1192,7 @@
         "message": "VTX type (3.3GHz grid)"
     },
     "configurationVTXGridTypeHelp": {
-        "message": "Which 3.3GHz transmitter is connected. IRC Tramp and SmartAudio command an absolute frequency, so the wrong grid tunes the VTX to the wrong frequency. Auto-detect identifies the VTX from what it reports and falls back to SX33 if it reports nothing usable. CLI: vtx_3g3_grid"
+        "message": "Which 3.3GHz transmitter is connected. IRC Tramp and SmartAudio command an absolute frequency, so the wrong grid tunes the VTX to the wrong frequency. Auto-detect identifies the VTX from what it reports and falls back to SX33 if it reports nothing usable. It cannot tell an FF3741 from an FF3.7 (they answer identically over SmartAudio), so pick those by hand. CLI: vtx_3g3_grid"
     },
     "configurationVTXGridTypeAuto": {
         "message": "Auto-detect"
@@ -1202,6 +1202,12 @@
     },
     "configurationVTXGridTypeTX3339": {
         "message": "BeastFPV TX3339-32CH (4 bands, 3060-3480 MHz, 10 W)"
+    },
+    "configurationVTXGridTypeNoname1": {
+        "message": "Noname_1 (2 bands, 3200-3500 MHz, 3 W)"
+    },
+    "configurationVTXGridTypeFF37": {
+        "message": "FF3.7 (1 band of 20 channels, 3700-4080 MHz)"
     },
     "configurationVTXGridDetected": {
         "message": "FC is using: $grid$ (detected by $how$; VTX reported $fmin$-$fmax$ MHz / $pmax$ mW)",
@@ -2025,6 +2031,15 @@
     },
     "programmingEepromSaved": {
         "message": "EEPROM <span style=\"color: #37a8db\">saved</span>: Programming"
+    },
+    "programmingVtxGridInUse": {
+        "message": "Values come from the grid the FC is using: $grid$. Change it in Configuration > VTX.",
+        "placeholders": {
+            "grid": { "content": "$1" }
+        }
+    },
+    "programmingVtxGridUnknown": {
+        "message": "The FC has not reported a 3.3GHz grid, so these are plain indexes."
     },
     "servosChangeDirection": {
         "message": "Change Direction in TX To Match"

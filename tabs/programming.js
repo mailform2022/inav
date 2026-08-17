@@ -17,7 +17,11 @@ TABS.programming.initialize = function (callback, scrollPosition) {
         mspHelper.loadLogicConditions,
         mspHelper.loadGlobalVariablesStatus,
         mspHelper.loadProgrammingPidStatus,
-        mspHelper.loadProgrammingPid
+        mspHelper.loadProgrammingPid,
+        // Set VTx Band/Channel/Power list their values from the grid the FC is
+        // actually tuning with, so the tab needs it even when Configuration
+        // was never opened in this session.
+        mspHelper.loadVTXConfig
     ]);
     loadChainer.setExitPoint(loadHtml);
     loadChainer.execute();

@@ -174,6 +174,10 @@ let LogicCondition = function (enabled, activatorId, operation, operandAType, op
             $container.append('<select class="logic_element__operand--value" data-operand="0"></select>');
             let $v = $container.find('.logic_element__operand--value');
             let list = self.getVtxOperandList();
+            let gridName = VTX.getActiveGridName();
+            $v.attr('title', gridName
+                ? chrome.i18n.getMessage('programmingVtxGridInUse', [gridName])
+                : chrome.i18n.getMessage('programmingVtxGridUnknown'));
             list.forEach(function (item) {
                 $v.append('<option value="' + item.value + '">' + item.label + '</option>');
             });
