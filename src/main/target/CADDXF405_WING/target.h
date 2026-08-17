@@ -111,6 +111,24 @@
 #define LSM6DXX_CS_PIN          PA4
 #define LSM6DXX_SPI_BUS         BUS_SPI1
 
+// BMI270
+#define USE_IMU_BMI270
+#define IMU_BMI270_ALIGN        CW270_DEG
+#define BMI270_CS_PIN           PA4
+#define BMI270_SPI_BUS          BUS_SPI1
+
+// MPU6000
+#define USE_IMU_MPU6000
+#define IMU_MPU6000_ALIGN       CW270_DEG
+#define MPU6000_CS_PIN          PA4
+#define MPU6000_SPI_BUS         BUS_SPI1
+
+// MPU6500
+#define USE_IMU_MPU6500
+#define IMU_MPU6500_ALIGN       CW270_DEG
+#define MPU6500_CS_PIN          PA4
+#define MPU6500_SPI_BUS         BUS_SPI1
+
 // Baro
 #define USE_BARO
 #define BARO_I2C_BUS            BUS_I2C1
@@ -119,6 +137,8 @@
 #define USE_BARO_BMP085
 #define USE_BARO_DPS310
 #define USE_BARO_SPL06
+#define USE_BARO_BMP388
+#define USE_BARO_BMP390
 
 //Mag
 #define USE_MAG
@@ -180,4 +200,7 @@
 
 #define USE_PINIO
 #define USE_PINIOBOX
-#define PINIO1_PIN                  PC13
+#define PINIO1_PIN                  PC13    // USER1 -> dual-camera video switch (C1/C2)
+// PA15 is the pad silkscreened S9 on this board; it carries the arming
+// ("vzvod") high level, so it is not a PWM pad.
+#define PINIO2_PIN                  PA15    // USER2 -> S9 arming high-level output

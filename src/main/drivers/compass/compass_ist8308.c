@@ -121,9 +121,10 @@ static bool ist8308Read(magDev_t * mag)
         return false;
     }
 
-    mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[0]) * LSB2FSV;
-    mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[2]) * LSB2FSV;
-    mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[4]) * LSB2FSV;
+    // Invert Y axis to convert from a left- to a right-handed coordinate system
+    mag->magADCRaw[X] =  (int16_t)(buf[1] << 8 | buf[0]) * LSB2FSV;
+    mag->magADCRaw[Y] = -(int16_t)(buf[3] << 8 | buf[2]) * LSB2FSV;
+    mag->magADCRaw[Z] =  (int16_t)(buf[5] << 8 | buf[4]) * LSB2FSV;
 
     return true;
 }

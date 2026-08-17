@@ -17,8 +17,13 @@
 
 #pragma once
 
+// Molniya airframe build. The SpeedyBee F405 Wing and the CADDX F405 Wing
+// share the same pinout, so this single binary runs on both boards; the board
+// identifier stays "SP4W" so the configurator treats them alike.
+#define USE_TARGET_CONFIG
+
 #define TARGET_BOARD_IDENTIFIER "SP4W"
-#define USBD_PRODUCT_STRING  "SpeedyBee F405 Wing"
+#define USBD_PRODUCT_STRING  "Molniya F405 Wing"
 
 // LEDs
 #define LED0                    PA14  //Blue
@@ -97,7 +102,10 @@
  * Sensor drivers
  */
 
-// ICM42605/ICM42688P
+// The airframe is built with several IMU variants, so every SPI1 candidate is
+// compiled in and left to the boot-time autodetection.
+
+// ICM42605/ICM42688P/ICM40609D
 #define USE_IMU_ICM42605
 #define IMU_ICM42605_ALIGN      CW270_DEG
 #define ICM42605_CS_PIN         PA4
@@ -198,13 +206,7 @@
 
 #define USE_PINIO
 #define USE_PINIOBOX
-// Pad numbering on this airframe's board does not follow the SpeedyBee
-// schematic. Measured with the CLI "gpio" command against the silkscreen:
-//   PB0 -> S3, PB10 -> S7, PA15 -> S9, PB11 -> S8, PB14 -> S11, PB15 -> S12
-// so the arming ("vzvod") high-level output must sit on PA15, not PB10.
-// Driving PC13 to either level on this airframe kills the composite input of
-// the OSD chip (STAT reports loss of sync); releasing it brings the picture
-// back, so the pin is only driven while USER1 is active.
 #define PINIO1_PIN                  PC13    // USER1 -> dual-camera video switch (C1/C2)
-#define PINIO1_FLAGS                PINIO_FLAGS_HIZ_IDLE
-#define PINIO2_PIN                  PA15    // USER2 -> S9 arming ("vzvod") high-level output
+// PA15 is the pad silkscreened S9 on this board (measured with the CLI "gpio"
+// command); it carries the arming ("vzvod") high level, so it is not a PWM pad.
+#define PINIO2_PIN                  PA15    // USER2 -> S9 arming high-level output

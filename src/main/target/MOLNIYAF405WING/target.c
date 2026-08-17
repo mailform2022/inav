@@ -30,8 +30,10 @@ timerHardware_t timerHardware[] = {
     DEF_TIM(TIM8,   CH3, PC8,  TIM_USE_OUTPUT_AUTO,   1, 0), // S5 D(2,4,7)
     DEF_TIM(TIM8,   CH4, PC9,  TIM_USE_OUTPUT_AUTO,   1, 0), // S6 D(2,7,7)
     
-    // PA15 is skipped: it is the PINIO2 arming high-level output, so the
-    // outputs after S6 shift up by one against the stock target.
+    // PA15 is skipped: it is the PINIO2 arming high-level output. On the boards
+    // of this airframe the pad silkscreen does not follow the schematic - PA15
+    // was measured with the CLI "gpio" command as the pad marked S9 - so the
+    // remaining outputs shift up by one against the stock target.
     DEF_TIM(TIM8,  CH2N, PB14, TIM_USE_OUTPUT_AUTO,   1, 0), // output 7
     DEF_TIM(TIM2,   CH3, PB10, TIM_USE_OUTPUT_AUTO,   1, 0), // output 8
     DEF_TIM(TIM2,   CH4, PB11, TIM_USE_OUTPUT_AUTO,   1, 0), // output 9
