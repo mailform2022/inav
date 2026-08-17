@@ -207,6 +207,6 @@
 #define USE_PINIO
 #define USE_PINIOBOX
 #define PINIO1_PIN                  PC13    // USER1 -> dual-camera video switch (C1/C2)
-// PA15 is the pad silkscreened S9 on this board (measured with the CLI "gpio"
-// command); it carries the arming ("vzvod") high level, so it is not a PWM pad.
-#define PINIO2_PIN                  PA15    // USER2 -> S9 arming high-level output
+// PB10 is the pad silkscreened S9 (measured with the CLI "gpio" command); it
+// carries the arming ("vzvod") high level, so it is not a PWM pad.
+#define PINIO2_PIN                  PB10    // USER2 -> S9 arming high-level output
