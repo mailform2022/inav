@@ -38,6 +38,6 @@ void targetConfiguration(void)
     serialConfigMutable()->portConfigs[findSerialPortIndexByIdentifier(SERIAL_PORT_USART6)].functionMask = FUNCTION_MSP;
 
     pinioBoxConfigMutable()->permanentId[0] = BOX_PERMANENT_ID_USER1;
-    // USER2 drives PA15 (pad S9) high, which releases the arming relay.
+    // USER2 drives PB10 (pad S9) high, which releases the arming relay.
     pinioBoxConfigMutable()->permanentId[1] = BOX_PERMANENT_ID_USER2;
 }
