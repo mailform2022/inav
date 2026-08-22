@@ -4879,6 +4879,11 @@ static void osdDrawPrivacyCurtain(void)
 
     char buff[OSD_CURTAIN_FIELD_WIDTH + 1];
 
+#if defined(USE_SERIALRX_CRSF)
+    tfp_sprintf(buff, "%3d", failsafeIsReceivingRxData() ? (int)constrain(rxLinkStatistics.uplinkLQ, 0, 100) : 0);
+    displayWrite(osdDisplayPort, winX1 - (OSD_CURTAIN_FIELD_WIDTH - 1), winY0, buff);
+#endif
+
     tfp_sprintf(buff, "%3d", (int)constrain(getThrottlePercent(false), -99, 100));
     displayWrite(osdDisplayPort, winX0, winY1, buff);
 
