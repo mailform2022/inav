@@ -4850,8 +4850,9 @@ static bool osdIsPageDownStickCommandHeld(void)
 
 // Privacy curtain: blanks the screen with opaque character cells to hide the
 // video from onlookers, leaving a central window on the camera picture with the
-// throttle position in its bottom left corner and the pitch angle (positive =
-// nose up) in its bottom right corner. Toggled by BOXUSER3.
+// throttle position in its bottom left corner, the pitch angle (positive =
+// nose up) in its bottom right corner and the uplink LQ in its top right
+// corner. Toggled by BOXUSER3.
 static void osdDrawPrivacyCurtain(void)
 {
     const uint8_t cols = osdDisplayPort->cols;
@@ -4877,11 +4878,12 @@ static void osdDrawPrivacyCurtain(void)
         }
     }
 
-    char buff[OSD_CURTAIN_FIELD_WIDTH + 1];
+    char buff[OSD_CURTAIN_FIELD_WIDTH + 2];
 
 #if defined(USE_SERIALRX_CRSF)
-    tfp_sprintf(buff, "%3d", failsafeIsReceivingRxData() ? (int)constrain(rxLinkStatistics.uplinkLQ, 0, 100) : 0);
-    displayWrite(osdDisplayPort, winX1 - (OSD_CURTAIN_FIELD_WIDTH - 1), winY0, buff);
+    buff[0] = SYM_LQ;
+    tfp_sprintf(buff + 1, "%3d", failsafeIsReceivingRxData() ? (int)constrain(rxLinkStatistics.uplinkLQ, 0, 100) : 0);
+    displayWrite(osdDisplayPort, winX1 - OSD_CURTAIN_FIELD_WIDTH, winY0, buff);
 #endif
 
     tfp_sprintf(buff, "%3d", (int)constrain(getThrottlePercent(false), -99, 100));
