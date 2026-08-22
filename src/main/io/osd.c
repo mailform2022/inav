@@ -4846,10 +4846,12 @@ static bool osdIsPageDownStickCommandHeld(void)
     return false;
 }
 
-// Privacy curtain: fills the screen with a repeating IC-chip glyph to hide
-// telemetry from onlookers, leaving a central window clear so the operator can
-// still see flight direction (video + artificial horizon + crosshair).
-// Toggled by BOXUSER3 (mapped to CH6 in the Duck config).
+#define OSD_CURTAIN_FIELD_WIDTH 3
+
+// Privacy curtain: blanks the screen with opaque character cells to hide the
+// video from onlookers, leaving a central window on the camera picture with the
+// throttle position in its bottom left corner and the pitch angle (positive =
+// nose up) in its bottom right corner. Toggled by BOXUSER3.
 static void osdDrawPrivacyCurtain(void)
 {
     const uint8_t cols = osdDisplayPort->cols;
@@ -4863,18 +4865,27 @@ static void osdDrawPrivacyCurtain(void)
     const uint8_t winX1 = winX0 + winW - 1;
     const uint8_t winY1 = winY0 + winH - 1;
 
-    // Keep the flight-direction reference visible inside the window.
-    osdDrawSingleElement(OSD_ARTIFICIAL_HORIZON);
-    osdDrawSingleElement(OSD_CROSSHAIRS);
+    textAttributes_t curtainAttr = TEXT_ATTRIBUTES_NONE;
+    TEXT_ATTRIBUTES_ADD_SOLID_BG(curtainAttr);
 
     for (uint8_t y = 0; y < rows; y++) {
         for (uint8_t x = 0; x < cols; x++) {
             if (x >= winX0 && x <= winX1 && y >= winY0 && y <= winY1) {
                 continue;
             }
-            displayWriteChar(osdDisplayPort, x, y, SYM_CURTAIN);
+            displayWriteCharWithAttr(osdDisplayPort, x, y, SYM_BLANK, curtainAttr);
         }
     }
+
+    char buff[OSD_CURTAIN_FIELD_WIDTH + 1];
+
+    tfp_sprintf(buff, "%3d", (int)constrain(getThrottlePercent(false), -99, 100));
+    displayWrite(osdDisplayPort, winX0, winY1, buff);
+
+    // attitude.values.pitch counts positive when the nose drops, the reading in
+    // the window follows the pilot's convention instead.
+    tfp_sprintf(buff, "%3d", (int)constrain(-attitude.values.pitch / 10, -99, 99));
+    displayWrite(osdDisplayPort, winX1 - (OSD_CURTAIN_FIELD_WIDTH - 1), winY1, buff);
 }
 
 static void osdRefresh(timeUs_t currentTimeUs)

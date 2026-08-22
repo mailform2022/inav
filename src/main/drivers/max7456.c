@@ -446,7 +446,7 @@ void max7456Init(const videoSystem_e videoSystem)
     }
 
     // Set the blink duty cycle
-    bufPtr = max7456PrepareBuffer(buf, sizeof(buf), bufPtr, MAX7456ADD_VM1, BLINK_DUTY_CYCLE_50_50 | BLINK_TIME_3 | BACKGROUND_BRIGHTNESS_28);
+    bufPtr = max7456PrepareBuffer(buf, sizeof(buf), bufPtr, MAX7456ADD_VM1, BLINK_DUTY_CYCLE_50_50 | BLINK_TIME_3 | BACKGROUND_BRIGHTNESS_0);
     busTransfer(state.dev, NULL, buf, bufPtr);
 }
 
