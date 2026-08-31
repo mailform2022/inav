@@ -21,7 +21,8 @@ TABS.programming.initialize = function (callback, scrollPosition) {
         // Set VTx Band/Channel/Power list their values from the grid the FC is
         // actually tuning with, so the tab needs it even when Configuration
         // was never opened in this session.
-        mspHelper.loadVTXConfig
+        mspHelper.loadVTXConfig,
+        mspHelper.loadVtxRcMap
     ]);
     loadChainer.setExitPoint(loadHtml);
     loadChainer.execute();
@@ -29,6 +30,7 @@ TABS.programming.initialize = function (callback, scrollPosition) {
     saveChainer.setChain([
         mspHelper.sendLogicConditions,
         mspHelper.sendProgrammingPid,
+        mspHelper.sendVtxRcMap,
         mspHelper.saveToEeprom
     ]);
     
@@ -50,6 +52,9 @@ TABS.programming.initialize = function (callback, scrollPosition) {
         PROGRAMMING_PID.init($('#subtab-pid'));
         PROGRAMMING_PID.render();
 
+        VTX_RC_MAP.init($('#subtab-vtxmap'));
+        VTX_RC_MAP.render();
+
         GLOBAL_VARIABLES_STATUS.init($(".gvar__container"));
 
         helper.tabs.init($('.tab-programming'));
@@ -57,6 +62,10 @@ TABS.programming.initialize = function (callback, scrollPosition) {
         localize();
 
         $('#save-button').click(function () {
+            if (!VTX_RC_MAP.isValid()) {
+                GUI.log(chrome.i18n.getMessage('vtxMapOverlapError'));
+                return;
+            }
             saveChainer.execute();
             GUI.log(chrome.i18n.getMessage('programmingEepromSaved'));
         });

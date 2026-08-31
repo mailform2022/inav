@@ -29,3 +29,46 @@
     color:#fff;
     font-weight: bold;
 }
+.vtxmap__help {
+    margin: 1em 0;
+    color: #666;
+}
+
+.vtxmap__table select,
+.vtxmap__table input[type="number"] {
+    width: auto;
+    max-width: 100%;
+}
+
+.vtxmap__table input[type="number"] {
+    width: 80px;
+}
+
+.vtxmap__row--conflict td {
+    background-color: #f8d7da;
+}
+
+.vtxmap__footer {
+    margin: 1em 0;
+}
+
+.vtxmap__add {
+    margin-right: 1em;
+    font-weight: bold;
+}
+
+.vtxmap__grid {
+    color: #666;
+}
+
+.vtxmap__error {
+    margin-left: 1em;
+    color: #c0392b;
+    font-weight: bold;
+}
+
+.vtxmap_element__delete {
+    color: #c0392b;
+    font-size: 1.4em;
+    text-decoration: none;
+}

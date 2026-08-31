@@ -2041,6 +2041,42 @@
     "programmingVtxGridUnknown": {
         "message": "The FC has not reported a 3.3GHz grid, so these are plain indexes."
     },
+    "vtxMapTab": {
+        "message": "VTX Channel Map"
+    },
+    "vtxMapHelp": {
+        "message": "Switch the VTX band/channel pair from a single RC channel: pick the channel, an exact value or a value range, and the pair to tune. Pairs come from the VTX selected in Configuration. Ranges on the same RC channel must not overlap."
+    },
+    "vtxMapId": {
+        "message": "#"
+    },
+    "vtxMapChannel": {
+        "message": "RC channel"
+    },
+    "vtxMapMode": {
+        "message": "Match"
+    },
+    "vtxMapValue": {
+        "message": "Value (us)"
+    },
+    "vtxMapPair": {
+        "message": "Band / channel"
+    },
+    "vtxMapModeExact": {
+        "message": "Exact value"
+    },
+    "vtxMapModeRange": {
+        "message": "Range"
+    },
+    "vtxMapAdd": {
+        "message": "Add mapping"
+    },
+    "vtxMapDelete": {
+        "message": "Delete mapping"
+    },
+    "vtxMapOverlapError": {
+        "message": "VTX channel map: values overlap on the same RC channel, only one band/channel pair can be active at a time."
+    },
     "servosChangeDirection": {
         "message": "Change Direction in TX To Match"
     },

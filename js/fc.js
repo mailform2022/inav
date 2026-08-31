@@ -23,6 +23,7 @@ var CONFIG,
     GLOBAL_FUNCTIONS,
     GLOBAL_VARIABLES_STATUS,
     PROGRAMMING_PID,
+    VTX_RC_MAP,
     PROGRAMMING_PID_STATUS,
     SERIAL_CONFIG,
     SENSOR_DATA,
@@ -196,6 +197,7 @@ var FC = {
         GLOBAL_VARIABLES_STATUS = new GlobalVariablesStatus();
         PROGRAMMING_PID         = new ProgrammingPidCollection();
         PROGRAMMING_PID_STATUS  = new ProgrammingPidStatus();
+        VTX_RC_MAP              = new VtxRcMapCollection();
 
         MIXER_CONFIG = {
             yawMotorDirection: 0,

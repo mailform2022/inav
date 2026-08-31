@@ -1620,6 +1620,25 @@ var mspHelper = (function (gui) {
                 console.log('Safehome points saved');
                 break;
 
+            case MSPCodes.MSP2_INAV_VTX_RC_MAP:
+                VTX_RC_MAP.flush();
+                let vtxMapCount = data.getUint8(0);
+                for (let i = 0; i < vtxMapCount; i++) {
+                    let offset = 1 + i * 7;
+                    VTX_RC_MAP.putFromFc(
+                        data.getUint8(offset),
+                        data.getUint8(offset + 1),
+                        data.getUint8(offset + 2),
+                        data.getUint16(offset + 3, true),
+                        data.getUint16(offset + 5, true)
+                    );
+                }
+                break;
+
+            case MSPCodes.MSP2_INAV_SET_VTX_RC_MAP:
+                console.log('VTX RC map saved');
+                break;
+
             case MSPCodes.MSP2_INAV_FW_APPROACH:
                 FW_APPROACH.put(new FwApproach(
                     data.getUint8(0),
@@ -3596,6 +3615,15 @@ var mspHelper = (function (gui) {
 
     self.saveVTXConfig = function (callback) {
         MSP.send_message(MSPCodes.MSP_SET_VTX_CONFIG, mspHelper.crunch(MSPCodes.MSP_SET_VTX_CONFIG), false, callback);
+    };
+
+    self.loadVtxRcMap = function (callback) {
+        VTX_RC_MAP.flush();
+        MSP.send_message(MSPCodes.MSP2_INAV_VTX_RC_MAP, false, false, callback);
+    };
+
+    self.sendVtxRcMap = function (callback) {
+        MSP.send_message(MSPCodes.MSP2_INAV_SET_VTX_RC_MAP, VTX_RC_MAP.extractBuffer(), false, callback);
     };
 
     self.loadBrakingConfig = function (callback) {

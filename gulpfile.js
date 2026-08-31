@@ -118,6 +118,7 @@ sources.js = [
     './js/programmingPidCollection.js',
     './js/programmingPidStatus.js',
     './js/vtx.js',
+    './js/vtxRcMap.js',
     './main.js',
     './js/tabs.js',
     './tabs/*.js',
