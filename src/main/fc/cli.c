@@ -2153,6 +2153,91 @@ static void cliLogic(char *cmdline) {
     processCliLogic(cmdline, -1);
 }
 
+#if defined(USE_VTX_CONTROL)
+static void printVtxMap(uint8_t dumpMask, const vtxRcMapEntry_t *entries, const vtxRcMapEntry_t *defaultEntries)
+{
+    const char *format = "vtxmap %d %d %d %d %d %d";
+    for (uint8_t i = 0; i < MAX_VTX_RC_MAP_ENTRIES; i++) {
+        const vtxRcMapEntry_t entry = entries[i];
+        bool equalsDefault = false;
+        if (defaultEntries) {
+            const vtxRcMapEntry_t defaultEntry = defaultEntries[i];
+            equalsDefault =
+                entry.rcChannel == defaultEntry.rcChannel &&
+                entry.band == defaultEntry.band &&
+                entry.channel == defaultEntry.channel &&
+                entry.rangeStart == defaultEntry.rangeStart &&
+                entry.rangeEnd == defaultEntry.rangeEnd;
+
+            cliDefaultPrintLinef(dumpMask, equalsDefault, format,
+                i,
+                defaultEntry.rcChannel,
+                defaultEntry.band,
+                defaultEntry.channel,
+                defaultEntry.rangeStart,
+                defaultEntry.rangeEnd
+            );
+        }
+        cliDumpPrintLinef(dumpMask, equalsDefault, format,
+            i,
+            entry.rcChannel,
+            entry.band,
+            entry.channel,
+            entry.rangeStart,
+            entry.rangeEnd
+        );
+    }
+}
+
+static void cliVtxMap(char *cmdline)
+{
+    char *saveptr;
+    int args[6], check = 0;
+
+    if (isEmpty(cmdline)) {
+        printVtxMap(DUMP_MASTER, vtxRcMapEntries(0), NULL);
+        return;
+    }
+
+    if (sl_strncasecmp(cmdline, "reset", 5) == 0) {
+        pgResetCopy(vtxRcMapEntriesMutable(0), PG_VTX_RC_MAP);
+        return;
+    }
+
+    enum { INDEX = 0, RC_CHANNEL, BAND, CHANNEL, RANGE_START, RANGE_END, ARGS_COUNT };
+
+    char *ptr = strtok_r(cmdline, " ", &saveptr);
+    while (ptr != NULL && check < ARGS_COUNT) {
+        args[check++] = fastA2I(ptr);
+        ptr = strtok_r(NULL, " ", &saveptr);
+    }
+
+    if (ptr != NULL || check != ARGS_COUNT) {
+        cliShowParseError();
+        return;
+    }
+
+    if (args[INDEX] < 0 || args[INDEX] >= MAX_VTX_RC_MAP_ENTRIES ||
+        args[RC_CHANNEL] < 0 || args[RC_CHANNEL] > VTX_RC_MAP_CHANNEL_COUNT ||
+        args[BAND] < 0 || args[BAND] > VTX_SETTINGS_MAX_BAND ||
+        args[CHANNEL] < 0 || args[CHANNEL] > VTX_SETTINGS_MAX_CHANNEL_ANY ||
+        args[RANGE_START] < 0 || args[RANGE_START] > 2500 ||
+        args[RANGE_END] < args[RANGE_START] || args[RANGE_END] > 2500) {
+        cliShowParseError();
+        return;
+    }
+
+    vtxRcMapEntry_t *entry = vtxRcMapEntriesMutable(args[INDEX]);
+    entry->rcChannel = args[RC_CHANNEL];
+    entry->band = args[BAND];
+    entry->channel = args[CHANNEL];
+    entry->rangeStart = args[RANGE_START];
+    entry->rangeEnd = args[RANGE_END];
+
+    printVtxMap(DUMP_MASTER, vtxRcMapEntries(0), NULL);
+}
+#endif
+
 static void printGvar(uint8_t dumpMask, const globalVariableConfig_t *gvars, const globalVariableConfig_t *defaultGvars)
 {
     const char *format = "gvar %d %d %d %d";
@@ -4351,6 +4436,11 @@ static void printConfig(const char *cmdline, bool doDiff)
         printOsdLayout(dumpMask, &osdLayoutsConfig_Copy, osdLayoutsConfig(), -1, -1);
 #endif
 
+#if defined(USE_VTX_CONTROL)
+        cliPrintHashLine("VTX: RC channel map [vtxmap]");
+        printVtxMap(dumpMask, vtxRcMapEntries_CopyArray, vtxRcMapEntries(0));
+#endif
+
 #ifdef USE_PROGRAMMING_FRAMEWORK
         cliPrintHashLine("Programming: logic");
         printLogic(dumpMask, logicConditions_CopyArray, logicConditions(0), -1);
@@ -4589,6 +4679,11 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("serialpassthrough", "passthrough serial data to port", "<id> [baud] [mode] : passthrough to serial", cliSerialPassthrough),
 #endif
     CLI_COMMAND_DEF("servo", "configure servos", NULL, cliServo),
+#if defined(USE_VTX_CONTROL)
+    CLI_COMMAND_DEF("vtxmap", "map an RC channel value to a VTX band/channel",
+        "<index> <rc channel 1-16> <band> <channel> <range start us> <range end us>\r\n"
+        "\treset\r\n", cliVtxMap),
+#endif
 #ifdef USE_PROGRAMMING_FRAMEWORK
     CLI_COMMAND_DEF("logic", "configure logic conditions",
         "<rule> <enabled> <activatorId> <operation> <operand A type> <operand A value> <operand B type> <operand B value> <flags>\r\n"

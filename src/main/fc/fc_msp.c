@@ -1676,6 +1676,20 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
 #endif
 
 #if defined(USE_VTX_CONTROL)
+    case MSP2_INAV_VTX_RC_MAP:
+        {
+            sbufWriteU8(dst, MAX_VTX_RC_MAP_ENTRIES);
+            for (int i = 0; i < MAX_VTX_RC_MAP_ENTRIES; i++) {
+                const vtxRcMapEntry_t *entry = vtxRcMapEntries(i);
+                sbufWriteU8(dst, entry->rcChannel);
+                sbufWriteU8(dst, entry->band);
+                sbufWriteU8(dst, entry->channel);
+                sbufWriteU16(dst, entry->rangeStart);
+                sbufWriteU16(dst, entry->rangeEnd);
+            }
+        }
+        break;
+
     case MSP2_INAV_VTX_TABLE_CUSTOM:
         {
             sbufWriteU8(dst, vtxSettingsConfig()->band);
@@ -2686,6 +2700,32 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
             return MSP_RESULT_ERROR;
         }
         break;
+
+#if defined(USE_VTX_CONTROL)
+    case MSP2_INAV_SET_VTX_RC_MAP:
+        {
+            if (dataSize < 1) {
+                return MSP_RESULT_ERROR;
+            }
+            const uint8_t count = sbufReadU8(src);
+            if (count > MAX_VTX_RC_MAP_ENTRIES || (int)dataSize != (int)(1 + count * 7)) {
+                return MSP_RESULT_ERROR;
+            }
+            for (int i = 0; i < MAX_VTX_RC_MAP_ENTRIES; i++) {
+                vtxRcMapEntry_t *entry = vtxRcMapEntriesMutable(i);
+                if (i < count) {
+                    entry->rcChannel = sbufReadU8(src);
+                    entry->band = sbufReadU8(src);
+                    entry->channel = sbufReadU8(src);
+                    entry->rangeStart = sbufReadU16(src);
+                    entry->rangeEnd = sbufReadU16(src);
+                } else {
+                    memset(entry, 0, sizeof(*entry));
+                }
+            }
+        }
+        break;
+#endif
 
     case MSP2_INAV_SET_VTX_TABLE_CUSTOM:
         if (dataSize >= 4) {

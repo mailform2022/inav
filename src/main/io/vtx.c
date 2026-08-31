@@ -229,6 +229,7 @@ void vtxUpdate(timeUs_t currentTimeUs)
     if (vtxDevice) {
         // Check input sources for config updates
         vtxControlInputPoll();
+        vtxUpdateRcMap();
 
         // Build runtime settings
         const vtxSettingsConfig_t * runtimeSettings = vtxGetRuntimeSettings();

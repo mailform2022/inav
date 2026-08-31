@@ -37,7 +37,10 @@
 
 #include "io/beeper.h"
 #include "io/osd.h"
+#include "io/vtx.h"
 #include "io/vtx_control.h"
+
+#include "rx/rx.h"
 
 #if defined(USE_VTX_CONTROL)
 
@@ -65,6 +68,8 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       },
       .vtx3g3ChanFreqFix = SETTING_VTX_3G3_CHAN_FREQFIX_DEFAULT,
 );
+
+PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 0);
 
 static uint8_t locked = 0;
 
@@ -139,6 +144,34 @@ void vtxUpdateActivatedChannel(void)
                 }
             }
         }
+    }
+}
+
+void vtxUpdateRcMap(void)
+{
+    static int8_t appliedEntry = -1;
+
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+
+        if (entry->rcChannel < 1 || entry->rcChannel > VTX_RC_MAP_CHANNEL_COUNT ||
+            entry->band < VTX_SETTINGS_MIN_BAND || entry->channel < VTX_SETTINGS_MIN_CHANNEL ||
+            entry->rangeEnd < entry->rangeStart) {
+            continue;
+        }
+
+        const uint16_t value = rxGetChannelValue(entry->rcChannel - 1);
+        if (value < entry->rangeStart || value > entry->rangeEnd) {
+            continue;
+        }
+
+        if (index != appliedEntry) {
+            appliedEntry = index;
+            vtxSettingsConfigMutable()->band = constrain(entry->band, VTX_SETTINGS_MIN_BAND, VTX_SETTINGS_MAX_BAND);
+            vtxSettingsConfigMutable()->channel = constrain(entry->channel, VTX_SETTINGS_MIN_CHANNEL, VTX_SETTINGS_MAX_CHANNEL_ANY);
+        }
+
+        return;
     }
 }
 

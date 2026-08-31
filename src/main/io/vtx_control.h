@@ -86,6 +86,22 @@ typedef struct vtxConfig_s {
 
 PG_DECLARE(vtxConfig_t, vtxConfig);
 
+#define MAX_VTX_RC_MAP_ENTRIES 20
+#define VTX_RC_MAP_CHANNEL_COUNT 16
+
+/* Maps a value (or an inclusive range of values) on one RC channel to a
+ * band/channel pair of the active grid, so a single transmitter channel can
+ * select any pair instead of one channel per axis. */
+typedef struct vtxRcMapEntry_s {
+    uint8_t  rcChannel;    // 1..16, 0 disables the entry
+    uint8_t  band;         // 1-based band of the active grid
+    uint8_t  channel;      // 1-based channel of the active grid
+    uint16_t rangeStart;   // inclusive, us
+    uint16_t rangeEnd;     // inclusive, us; equal to rangeStart for an exact match
+} vtxRcMapEntry_t;
+
+PG_DECLARE_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries);
+
 void vtxControlInit(void);
 void vtxControlInputPoll(void);
 
@@ -98,5 +114,6 @@ void vtxCyclePower(const uint8_t powerStep);
 void vtxCycleBandOrChannel(const uint8_t bandStep, const uint8_t channelStep);
 
 void vtxUpdateActivatedChannel(void);
+void vtxUpdateRcMap(void);
 
 void handleVTXControlButton(void);
