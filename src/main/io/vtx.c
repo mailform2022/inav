@@ -92,13 +92,48 @@ static vtxSettingsConfig_t * vtxGetRuntimeSettings(void)
     return &settings;
 }
 
-static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice, const vtxSettingsConfig_t * runtimeSettings)
+// The SX33 and the TX3339 do not report the pair they sit on, so a command sent
+// for a passing value - or lost on the wire - is never corrected and leaves the
+// VTX one channel off. Act on a pair that held still and repeat it after a change.
+#define VTX_BANDCHAN_SETTLE_MS 500
+#define VTX_BANDCHAN_REASSERT_MS 1000
+
+static uint8_t settledBand = 0;
+static uint8_t settledChannel = 0;
+
+static void vtxTrackBandAndChannel(const vtxSettingsConfig_t * runtimeSettings)
 {
+    static uint8_t candidateBand = 0;
+    static uint8_t candidateChannel = 0;
+    static timeMs_t candidateSinceMs = 0;
+
+    const timeMs_t nowMs = millis();
+
+    if (runtimeSettings->band != candidateBand || runtimeSettings->channel != candidateChannel) {
+        candidateBand = runtimeSettings->band;
+        candidateChannel = runtimeSettings->channel;
+        candidateSinceMs = nowMs;
+        return;
+    }
+
+    if ((nowMs - candidateSinceMs) >= VTX_BANDCHAN_SETTLE_MS) {
+        settledBand = candidateBand;
+        settledChannel = candidateChannel;
+    }
+}
+
+static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice)
+{
+    static uint8_t commandedBand = 0;
+    static uint8_t commandedChannel = 0;
+    static uint8_t reassertsLeft = 0;
+    static timeMs_t lastSendMs = 0;
+
     uint8_t vtxBand;
     uint8_t vtxChan;
 
     // Shortcut for undefined band
-    if (!runtimeSettings->band) {
+    if (!settledBand) {
         return false;
     }
 
@@ -106,8 +141,26 @@ static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice, const vtxSettingsCo
         return false;
     }
 
-    if (vtxBand != runtimeSettings->band || vtxChan != runtimeSettings->channel) {
-        vtxCommonSetBandAndChannel(vtxDevice, runtimeSettings->band, runtimeSettings->channel);
+    const timeMs_t nowMs = millis();
+
+    if (settledBand != commandedBand || settledChannel != commandedChannel) {
+        commandedBand = settledBand;
+        commandedChannel = settledChannel;
+        reassertsLeft = vtxConfig()->vtx3g3ChanReassert;
+    }
+
+    if (vtxBand != settledBand || vtxChan != settledChannel) {
+        lastSendMs = nowMs;
+        vtxCommonSetBandAndChannel(vtxDevice, settledBand, settledChannel);
+        return true;
+    }
+
+    // The device reports the pair we asked for - which on these clones is only
+    // an echo of the request - so repeat the command to survive a lost frame.
+    if (reassertsLeft && (nowMs - lastSendMs) >= VTX_BANDCHAN_REASSERT_MS) {
+        reassertsLeft--;
+        lastSendMs = nowMs;
+        vtxCommonSetBandAndChannel(vtxDevice, settledBand, settledChannel);
         return true;
     }
 
@@ -234,12 +287,14 @@ void vtxUpdate(timeUs_t currentTimeUs)
         // Build runtime settings
         const vtxSettingsConfig_t * runtimeSettings = vtxGetRuntimeSettings();
 
+        vtxTrackBandAndChannel(runtimeSettings);
+
         switch (currentSchedule) {
             case VTX_PARAM_POWER:
                 vtxProcessPower(vtxDevice, runtimeSettings);
                 break;
             case VTX_PARAM_BANDCHAN:
-                vtxProcessBandAndChannel(vtxDevice, runtimeSettings);
+                vtxProcessBandAndChannel(vtxDevice);
                 break;
             case VTX_PARAM_PITMODE:
                 vtxProcessPitMode(vtxDevice, runtimeSettings);

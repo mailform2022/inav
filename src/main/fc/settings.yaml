@@ -3869,6 +3869,13 @@ groups:
         min: 0
         max: 200
         type: uint8_t
+      - name: vtx_3g3_chan_reassert
+        description: "How many extra times the band/channel command is repeated after a change. The SX33 and TX3339 do not report the pair they are on, so a command lost on the wire would leave the VTX on the previous channel. 2 by default, 0 disables the repeats."
+        default_value: 2
+        field: vtx3g3ChanReassert
+        min: 0
+        max: 10
+        type: uint8_t
       - name: vtx_3g3_sa_pulldown
         description: "3.3GHz SmartAudio (FF3741): pull the half-duplex SmartAudio line LOW while idle instead of letting it float, matching Betaflight's SmartAudio pull-down. A floating single-wire line couples noise into the analog video and can produce stripes/bars on the FF3741. ON by default; only affects the SmartAudio port while the 3.3GHz frequency group is selected. Takes effect after a reboot."
         default_value: ON

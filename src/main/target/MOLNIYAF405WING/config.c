@@ -27,9 +27,14 @@
 
 #include "platform.h"
 
+#include "common/maths.h"
+#include "fc/config.h"
 #include "fc/fc_msp_box.h"
+#include "fc/rc_modes.h"
 #include "io/serial.h"
 #include "io/piniobox.h"
+
+#define MOLNIYA_USER4_AUX_INDEX 5   // AUX6 == CH10
 
 void targetConfiguration(void)
 {
@@ -40,4 +45,10 @@ void targetConfiguration(void)
     pinioBoxConfigMutable()->permanentId[0] = BOX_PERMANENT_ID_USER1;
     // USER2 drives PB10 (pad S9) high, which releases the arming relay.
     pinioBoxConfigMutable()->permanentId[1] = BOX_PERMANENT_ID_USER2;
+
+    // USER4 on CH10, the same switch that throws the S7 servo between its end points.
+    modeActivationConditionsMutable(0)->modeId = BOXUSER4;
+    modeActivationConditionsMutable(0)->auxChannelIndex = MOLNIYA_USER4_AUX_INDEX;
+    modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(1700);
+    modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(2100);
 }
