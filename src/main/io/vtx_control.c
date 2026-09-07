@@ -70,7 +70,7 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
       .vtx3g3ChanFreqFix = SETTING_VTX_3G3_CHAN_FREQFIX_DEFAULT,
 );
 
-PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 0);
+PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 1);
 
 static uint8_t locked = 0;
 
@@ -170,6 +170,9 @@ void vtxUpdateRcMap(void)
             appliedEntry = index;
             vtxSettingsConfigMutable()->band = constrain(entry->band, VTX_SETTINGS_MIN_BAND, VTX_SETTINGS_MAX_BAND);
             vtxSettingsConfigMutable()->channel = constrain(entry->channel, VTX_SETTINGS_MIN_CHANNEL, VTX_SETTINGS_MAX_CHANNEL_ANY);
+            if (entry->power) {
+                vtxSettingsConfigMutable()->power = entry->power;
+            }
         }
 
         return;

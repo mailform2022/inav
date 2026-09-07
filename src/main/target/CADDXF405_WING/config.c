@@ -33,8 +33,11 @@
 #include "fc/rc_modes.h"
 #include "io/serial.h"
 #include "io/piniobox.h"
+#include "flight/servos.h"
+#include "flight/mixer_profile.h"
 
 #define MOLNIYA_USER4_AUX_INDEX 5   // AUX6 == CH10
+#define MOLNIYA_S7_SERVO_INDEX 5    // pad S7, PB14
 
 void targetConfiguration(void)
 {
@@ -51,4 +54,19 @@ void targetConfiguration(void)
     modeActivationConditionsMutable(0)->auxChannelIndex = MOLNIYA_USER4_AUX_INDEX;
     modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(1700);
     modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(2100);
+
+    // S7 is a plain servo output driven straight from CH10, so a two-position
+    // switch throws it between the two end points set with the servo command.
+    customServoMixersMutable(0)->targetChannel = MOLNIYA_S7_SERVO_INDEX;
+    customServoMixersMutable(0)->inputSource = INPUT_RC_CH10;
+    customServoMixersMutable(0)->rate = 100;
+    customServoMixersMutable(0)->speed = 0;
+#ifdef USE_PROGRAMMING_FRAMEWORK
+    customServoMixersMutable(0)->conditionId = -1;
+#endif
+
+    servoParamsMutable(MOLNIYA_S7_SERVO_INDEX)->min = 1000;
+    servoParamsMutable(MOLNIYA_S7_SERVO_INDEX)->max = 2000;
+    servoParamsMutable(MOLNIYA_S7_SERVO_INDEX)->middle = 1500;
+    servoParamsMutable(MOLNIYA_S7_SERVO_INDEX)->rate = 100;
 }

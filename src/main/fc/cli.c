@@ -2156,7 +2156,7 @@ static void cliLogic(char *cmdline) {
 #if defined(USE_VTX_CONTROL)
 static void printVtxMap(uint8_t dumpMask, const vtxRcMapEntry_t *entries, const vtxRcMapEntry_t *defaultEntries)
 {
-    const char *format = "vtxmap %d %d %d %d %d %d";
+    const char *format = "vtxmap %d %d %d %d %d %d %d";
     for (uint8_t i = 0; i < MAX_VTX_RC_MAP_ENTRIES; i++) {
         const vtxRcMapEntry_t entry = entries[i];
         bool equalsDefault = false;
@@ -2166,6 +2166,7 @@ static void printVtxMap(uint8_t dumpMask, const vtxRcMapEntry_t *entries, const 
                 entry.rcChannel == defaultEntry.rcChannel &&
                 entry.band == defaultEntry.band &&
                 entry.channel == defaultEntry.channel &&
+                entry.power == defaultEntry.power &&
                 entry.rangeStart == defaultEntry.rangeStart &&
                 entry.rangeEnd == defaultEntry.rangeEnd;
 
@@ -2174,6 +2175,7 @@ static void printVtxMap(uint8_t dumpMask, const vtxRcMapEntry_t *entries, const 
                 defaultEntry.rcChannel,
                 defaultEntry.band,
                 defaultEntry.channel,
+                defaultEntry.power,
                 defaultEntry.rangeStart,
                 defaultEntry.rangeEnd
             );
@@ -2183,6 +2185,7 @@ static void printVtxMap(uint8_t dumpMask, const vtxRcMapEntry_t *entries, const 
             entry.rcChannel,
             entry.band,
             entry.channel,
+            entry.power,
             entry.rangeStart,
             entry.rangeEnd
         );
@@ -2192,7 +2195,7 @@ static void printVtxMap(uint8_t dumpMask, const vtxRcMapEntry_t *entries, const 
 static void cliVtxMap(char *cmdline)
 {
     char *saveptr;
-    int args[6], check = 0;
+    int args[7], check = 0;
 
     if (isEmpty(cmdline)) {
         printVtxMap(DUMP_MASTER, vtxRcMapEntries(0), NULL);
@@ -2204,7 +2207,7 @@ static void cliVtxMap(char *cmdline)
         return;
     }
 
-    enum { INDEX = 0, RC_CHANNEL, BAND, CHANNEL, RANGE_START, RANGE_END, ARGS_COUNT };
+    enum { INDEX = 0, RC_CHANNEL, BAND, CHANNEL, POWER, RANGE_START, RANGE_END, ARGS_COUNT };
 
     char *ptr = strtok_r(cmdline, " ", &saveptr);
     while (ptr != NULL && check < ARGS_COUNT) {
@@ -2221,6 +2224,7 @@ static void cliVtxMap(char *cmdline)
         args[RC_CHANNEL] < 0 || args[RC_CHANNEL] > VTX_RC_MAP_CHANNEL_COUNT ||
         args[BAND] < 0 || args[BAND] > VTX_SETTINGS_MAX_BAND ||
         args[CHANNEL] < 0 || args[CHANNEL] > VTX_SETTINGS_MAX_CHANNEL_ANY ||
+        args[POWER] < 0 || args[POWER] > VTX_RC_MAP_MAX_POWER ||
         args[RANGE_START] < 0 || args[RANGE_START] > 2500 ||
         args[RANGE_END] < args[RANGE_START] || args[RANGE_END] > 2500) {
         cliShowParseError();
@@ -2231,6 +2235,7 @@ static void cliVtxMap(char *cmdline)
     entry->rcChannel = args[RC_CHANNEL];
     entry->band = args[BAND];
     entry->channel = args[CHANNEL];
+    entry->power = args[POWER];
     entry->rangeStart = args[RANGE_START];
     entry->rangeEnd = args[RANGE_END];
 
@@ -4681,7 +4686,7 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("servo", "configure servos", NULL, cliServo),
 #if defined(USE_VTX_CONTROL)
     CLI_COMMAND_DEF("vtxmap", "map an RC channel value to a VTX band/channel",
-        "<index> <rc channel 1-16> <band> <channel> <range start us> <range end us>\r\n"
+        "<index> <rc channel 1-16> <band> <channel> <power, 0 keeps current> <range start us> <range end us>\r\n"
         "\treset\r\n", cliVtxMap),
 #endif
 #ifdef USE_PROGRAMMING_FRAMEWORK

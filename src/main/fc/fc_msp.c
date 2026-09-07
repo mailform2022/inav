@@ -1684,6 +1684,7 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
                 sbufWriteU8(dst, entry->rcChannel);
                 sbufWriteU8(dst, entry->band);
                 sbufWriteU8(dst, entry->channel);
+                sbufWriteU8(dst, entry->power);
                 sbufWriteU16(dst, entry->rangeStart);
                 sbufWriteU16(dst, entry->rangeEnd);
             }
@@ -2708,7 +2709,7 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
                 return MSP_RESULT_ERROR;
             }
             const uint8_t count = sbufReadU8(src);
-            if (count > MAX_VTX_RC_MAP_ENTRIES || (int)dataSize != (int)(1 + count * 7)) {
+            if (count > MAX_VTX_RC_MAP_ENTRIES || (int)dataSize != (int)(1 + count * 8)) {
                 return MSP_RESULT_ERROR;
             }
             for (int i = 0; i < MAX_VTX_RC_MAP_ENTRIES; i++) {
@@ -2717,6 +2718,7 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
                     entry->rcChannel = sbufReadU8(src);
                     entry->band = sbufReadU8(src);
                     entry->channel = sbufReadU8(src);
+                    entry->power = sbufReadU8(src);
                     entry->rangeStart = sbufReadU16(src);
                     entry->rangeEnd = sbufReadU16(src);
                 } else {
