@@ -45,6 +45,10 @@
 
 #define VTX_PKT_SIZE                16
 #define VTX_PROTO_STATE_TIMEOUT_MS  1000
+// Delay between a command and the status query that confirms it. The full
+// protocol timeout (1 s) here made every channel change take seconds; IRC
+// Tramp devices accept a status query far sooner than that.
+#define VTX_PROTO_CMD_SETTLE_MS     150
 #define VTX_STATUS_INTERVAL_MS      2000
 // Some IRC Tramp clones (notably the 3.3 GHz SX33) lock their panel buttons the
 // moment they receive the first capabilities query, but will only complete the
@@ -298,6 +302,11 @@ static void vtxProtoSetPitMode(uint16_t mode)
     vtxProtoSend(0x73, mode);
 }
 
+static bool vtxPowerReadbackComparable(void)
+{
+    return !(vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && !vtx3G3_TrampPowerIsMilliwatt());
+}
+
 static void vtxProtoSetPower(uint16_t power)
 {
     vtxProtoSend(0x50, power);
@@ -386,7 +395,7 @@ static void impl_Process(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
         case VTX_STATE_QUERY_DELAY:
             // We get here after sending the command. We give VTX some time to process the command
             // and switch to VTX_STATE_QUERY_STATUS
-            if (vtxProtoTimeout()) {
+            if ((millis() - vtxState.lastStateChangeMs) >= VTX_PROTO_CMD_SETTLE_MS) {
                 // We gave VTX some time to process the command. Query status to confirm success
                 vtxProtoSetState(VTX_STATE_QUERY_STATUS);
             }
@@ -414,7 +423,14 @@ static void impl_Process(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
                         vtxState.updateReqMask |= VTX_UPDATE_REQ_FREQUENCY;
                     }
 
-                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_POWER) && (vtxState.state.power != 0) && (vtxState.state.power != vtxState.request.devicePower)) {
+                    // Power is only comparable when the device speaks the same
+                    // units as the command. On the 3.3 GHz grids that take scale
+                    // codes (SX33, TX3339) the read-back is the real output in mW
+                    // and never equals the code, so comparing them re-sent the
+                    // power command after every status cycle - which is what made
+                    // a channel change look like a slow power ramp.
+                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_POWER) && vtxPowerReadbackComparable() &&
+                        (vtxState.state.power != 0) && (vtxState.state.power != vtxState.request.devicePower)) {
                         vtxState.updateReqMask |= VTX_UPDATE_REQ_POWER;
                     }
 
@@ -561,6 +577,17 @@ static bool impl_GetFreq(const vtxDevice_t *vtxDevice, uint16_t *pFreq)
 
     *pFreq = vtxState.request.freq;
     return true;
+}
+
+// True when the device reported the frequency it is actually tuned to and that
+// frequency is the one asked for. Clones that never report their state (SX33)
+// answer with zero and are not confirmed, so the caller keeps its blind repeats.
+bool vtxTrampFrequencyConfirmed(void)
+{
+    return (vtxState.protoState >= VTX_STATE_IDLE) &&
+           !(vtxState.updateReqMask & VTX_UPDATE_REQ_FREQUENCY) &&
+           (vtxState.state.freq != 0) &&
+           (vtxState.state.freq == vtxState.request.freq);
 }
 
 static bool impl_GetPower(const vtxDevice_t *vtxDevice, uint8_t *pIndex, uint16_t *pPowerMw)

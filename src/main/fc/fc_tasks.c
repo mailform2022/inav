@@ -625,7 +625,10 @@ cfTask_t cfTasks[TASK_COUNT] = {
     [TASK_VTXCTRL] = {
         .taskName = "VTXCTRL",
         .taskFunc = vtxUpdate,
-        .desiredPeriod = TASK_PERIOD_HZ(5),          // 5Hz @200msec
+        // The VTX drivers are protothreads clocked by this task: at 5 Hz every
+        // protocol step cost 200 ms and a channel change took seconds. 20 Hz
+        // keeps the (ms-based) protocol timings and only tightens the steps.
+        .desiredPeriod = TASK_PERIOD_HZ(20),         // 20Hz @50msec
         .staticPriority = TASK_PRIORITY_IDLE,
     },
 #endif

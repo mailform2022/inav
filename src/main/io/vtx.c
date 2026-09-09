@@ -95,8 +95,12 @@ static vtxSettingsConfig_t * vtxGetRuntimeSettings(void)
 // The SX33 and the TX3339 do not report the pair they sit on, so a command sent
 // for a passing value - or lost on the wire - is never corrected and leaves the
 // VTX one channel off. Act on a pair that held still and repeat it after a change.
-#define VTX_BANDCHAN_SETTLE_MS 500
-#define VTX_BANDCHAN_REASSERT_MS 1000
+// The settle window only has to outlast a switch sweeping through intermediate
+// positions; it is paid on every change, so it is kept as short as that allows.
+// A pair held for longer than the window during a deliberately slow sweep is
+// tuned, but the sweep still ends on the selected pair.
+#define VTX_BANDCHAN_SETTLE_MS 250
+#define VTX_BANDCHAN_REASSERT_MS 250
 
 static uint8_t settledBand = 0;
 static uint8_t settledChannel = 0;
@@ -157,6 +161,15 @@ static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice)
 
     // The device reports the pair we asked for - which on these clones is only
     // an echo of the request - so repeat the command to survive a lost frame.
+    // A device that does report the frequency it is tuned to (TX3339) confirms
+    // the change itself, so the repeats - and the extra video blanks they cause
+    // - are dropped as soon as the read-back matches.
+#if defined(USE_VTX_TRAMP)
+    if (reassertsLeft && vtxCommonGetDeviceType(vtxDevice) == VTXDEV_TRAMP && vtxTrampFrequencyConfirmed()) {
+        reassertsLeft = 0;
+    }
+#endif
+
     if (reassertsLeft && (nowMs - lastSendMs) >= VTX_BANDCHAN_REASSERT_MS) {
         reassertsLeft--;
         lastSendMs = nowMs;

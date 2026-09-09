@@ -53,6 +53,10 @@
 bool vtxTrampInit(void);
 void vtxTrampDeinit(void);
 
+// True when the VTX reported the frequency it is tuned to and it matches the
+// request, i.e. the read-back can be trusted instead of blind repeats.
+bool vtxTrampFrequencyConfirmed(void);
+
 // Last response frames exactly as received, or NULL if none arrived yet. Used to
 // fingerprint devices whose parsed fields are identical.
 #define VTX_TRAMP_PKT_SIZE 16
