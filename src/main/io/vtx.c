@@ -45,6 +45,7 @@
 #include "io/serial.h"
 #include "io/vtx.h"
 #include "io/vtx_string.h"
+#include "io/vtx_trace.h"
 #include "io/vtx_control.h"
 #include "io/vtx_smartaudio.h"
 #include "io/vtx_tramp.h"
@@ -70,6 +71,9 @@ typedef enum {
 
 void vtxInit(void)
 {
+#ifdef USE_VTX_TRACE
+    vtxTraceInit();
+#endif
 }
 
 static vtxSettingsConfig_t * vtxGetRuntimeSettings(void)
@@ -286,6 +290,10 @@ void vtxUpdate(timeUs_t currentTimeUs)
     if (cliMode) {
         return;
     }
+
+#ifdef USE_VTX_TRACE
+    vtxTraceUpdate(currentTimeUs / 1000);
+#endif
 
 #if defined(USE_VTX_SMARTAUDIO) && defined(USE_VTX_TRAMP)
     vtxAutoDetectUpdate();

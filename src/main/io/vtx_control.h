@@ -50,6 +50,7 @@ typedef enum {
     VTX_3G3_GRID_AUTO,         // Pick from what the attached VTX reports, SX33 if it says nothing useful
     VTX_3G3_GRID_NONAME1,      // "Noname_1" 3W IRC Tramp: 2 bands, 3200-3500 MHz, 25mW/400mW/1W/3W
     VTX_3G3_GRID_FF37,         // "FF3.7" SmartAudio: 1 band of 20 channels, 3700-4080 MHz
+    VTX_3G3_GRID_CUSTOM,       // user table from `vtxgrid` (any band, 1.2-7.2 GHz)
     VTX_3G3_GRID_COUNT,
 } vtx3g3Grid_e;
 
@@ -104,6 +105,35 @@ typedef struct vtxRcMapEntry_s {
 } vtxRcMapEntry_t;
 
 PG_DECLARE_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries);
+
+/*
+ * User-defined band/channel/power table, selected with vtx_3g3_grid = CUSTOM.
+ * Decouples the frequency table from the protocol driver so a VTX in any band
+ * (1.2-1.5, 3.3-3.7, 4.9-5.8, 6.1-7.2 GHz) can be described from the CLI
+ * without a firmware rebuild:
+ *   vtxgrid band <1-8> <MHz>...          one row, all rows must be equal length
+ *   vtxgrid power <1-8> <mW> [code] [dBm] one power level; code = value put on
+ *                                        the Tramp wire (0 = send mW)
+ *   vtxgrid reset
+ * Whether the attached hardware can actually tune there is up to the VTX.
+ */
+#define VTX_CUSTOM_GRID_MAX_BANDS    8
+#define VTX_CUSTOM_GRID_MAX_CHANNELS 20
+#define VTX_CUSTOM_GRID_MAX_POWER    8
+#define VTX_CUSTOM_GRID_MIN_MHZ      100
+#define VTX_CUSTOM_GRID_MAX_MHZ      7500
+
+typedef struct vtxCustomGridConfig_s {
+    uint16_t freq[VTX_CUSTOM_GRID_MAX_BANDS][VTX_CUSTOM_GRID_MAX_CHANNELS];  // MHz, 0 = unused slot
+    uint16_t powerMw[VTX_CUSTOM_GRID_MAX_POWER];
+    uint16_t powerCode[VTX_CUSTOM_GRID_MAX_POWER];   // Tramp set-power value, 0 = same as mW
+    uint8_t  powerDbm[VTX_CUSTOM_GRID_MAX_POWER];    // SmartAudio 2.1 dBm
+    uint8_t  bandCount;
+    uint8_t  chanCount;
+    uint8_t  powerCount;
+} vtxCustomGridConfig_t;
+
+PG_DECLARE(vtxCustomGridConfig_t, vtxCustomGridConfig);
 
 void vtxControlInit(void);
 void vtxControlInputPoll(void);

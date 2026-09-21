@@ -83,6 +83,7 @@
 #include "sensors/esc_sensor.h"
 #include "flight/wind_estimator.h"
 #include "sensors/temperature.h"
+#include "io/vtx_trace.h"
 
 
 #if defined(ENABLE_BLACKBOX_LOGGING_ON_SPIFLASH_BY_DEFAULT)
@@ -1503,6 +1504,52 @@ void blackboxStart(void)
     blackboxSetState(BLACKBOX_STATE_PREPARE_LOG_FILE);
 }
 
+#ifdef USE_VTX_TRACE
+// Text budget for the raw VTX exchange appended to each log. Decoders stop at
+// the "End of log" event, so this lives in the raw dump only (grep "^V ").
+#define BLACKBOX_VTX_TRACE_BUDGET 12288
+
+/* Append the raw VTX serial exchange (oldest first, most recent kept when the
+ * budget runs out) after the end-of-log marker, so a crash log also carries
+ * every byte the VTX said during that flight. */
+static void blackboxWriteVtxTrace(void)
+{
+    static const char * const protoNames[] = { "TRAMP", "SA" };
+    vtxTraceRecord_t rec;
+    uint32_t total = 0;
+    uint32_t count;
+
+    vtxTraceUpdate(millis());
+    const vtxTraceStats_t *st = vtxTraceStats();
+
+    // Size each line as printed below (worst case) to find where the tail fits.
+    for (count = 0; vtxTraceGet(count, &rec); count++) {
+        total += 30 + rec.len * 3;
+    }
+    uint32_t first = 0;
+    while (first < count && total > BLACKBOX_VTX_TRACE_BUDGET) {
+        vtxTraceGet(first++, &rec);
+        total -= 30 + rec.len * 3;
+    }
+
+    blackboxPrintf("\nV vtxtrace records:%u dropped:%u skipped:%u tx:%u rx:%u\n",
+        (unsigned)st->records, (unsigned)st->dropped, (unsigned)first, (unsigned)st->txBytes, (unsigned)st->rxBytes);
+    for (uint32_t i = first; vtxTraceGet(i, &rec); i++) {
+        blackboxPrintf("V %u %s %s", (unsigned)rec.timeMs,
+            rec.proto < ARRAYLEN(protoNames) ? protoNames[rec.proto] : "?",
+            rec.dir == VTX_TRACE_DIR_TX ? "TX" : "RX");
+        if (rec.repeats) {
+            blackboxPrintf(" x%u", (unsigned)rec.repeats + 1);
+        }
+        for (uint8_t b = 0; b < rec.len; b++) {
+            blackboxPrintf(" %02X", rec.data[b]);
+        }
+        blackboxWrite('\n');
+    }
+    blackboxPrintf("V end\n");
+}
+#endif
+
 /**
  * Begin Blackbox shutdown.
  */
@@ -1518,6 +1565,9 @@ void blackboxFinish(void)
     case BLACKBOX_STATE_RUNNING:
     case BLACKBOX_STATE_PAUSED:
         blackboxLogEvent(FLIGHT_LOG_EVENT_LOG_END, NULL);
+#ifdef USE_VTX_TRACE
+        blackboxWriteVtxTrace();
+#endif
         FALLTHROUGH;
 
     default:

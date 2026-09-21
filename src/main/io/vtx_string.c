@@ -25,6 +25,8 @@
 #include "platform.h"
 #include "build/debug.h"
 #include "common/utils.h"
+#include "common/maths.h"
+#include "common/printf.h"
 
 #include "config/parameter_group.h"
 #include "drivers/vtx_common.h"
@@ -397,9 +399,129 @@ uint8_t vtx3G3_EffectiveGrid(void)
     return VTX_3G3_GRID_SX33;
 }
 
+#if defined(USE_VTX_CONTROL)
+/* CUSTOM grid: a vtx3G3GridInfo_t assembled at runtime from the vtxCustomGridConfig
+ * parameter group, so every consumer (Tramp/SmartAudio drivers, CMS, OSD, CLI,
+ * MSP, RC map) sees a user table exactly like a built-in one. Rebuilt lazily
+ * after the CLI changes the table. */
+static const char * const vtxCustomBandNames[VTX_CUSTOM_GRID_MAX_BANDS + 1] = {
+    "-", "A", "B", "C", "D", "E", "F", "G", "H",
+};
+static const char * const vtxCustomChanNames[VTX_CUSTOM_GRID_MAX_CHANNELS + 1] = {
+    "-", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+};
+static uint16_t vtxCustomFreq[VTX_CUSTOM_GRID_MAX_BANDS * VTX_CUSTOM_GRID_MAX_CHANNELS];
+static char vtxCustomPowerNameBuf[VTX_CUSTOM_GRID_MAX_POWER][6];
+static const char *vtxCustomPowerNames[VTX_CUSTOM_GRID_MAX_POWER + 1];
+static uint16_t vtxCustomPowerLevels[VTX_CUSTOM_GRID_MAX_POWER];
+static uint8_t vtxCustomPowerDbm[VTX_CUSTOM_GRID_MAX_POWER];
+static vtx3G3GridInfo_t vtxCustomGrid;
+static bool vtxCustomGridDirty = true;
+
+void vtx3G3_CustomGridInvalidate(void)
+{
+    vtxCustomGridDirty = true;
+}
+
+static void vtx3G3_CustomGridRebuild(void)
+{
+    const vtxCustomGridConfig_t *cfg = vtxCustomGridConfig();
+    uint8_t bands = MIN(cfg->bandCount, VTX_CUSTOM_GRID_MAX_BANDS);
+    uint8_t chans = MIN(cfg->chanCount, VTX_CUSTOM_GRID_MAX_CHANNELS);
+    uint8_t powers = MIN(cfg->powerCount, VTX_CUSTOM_GRID_MAX_POWER);
+    uint16_t fmin = 0xFFFF, fmax = 0;
+    bool milliwatt = true;
+
+    // An empty table must still be a usable grid: one band, one channel, one
+    // power level, so nothing downstream divides by or indexes past zero.
+    if (bands == 0 || chans == 0) {
+        bands = 1;
+        chans = 1;
+    }
+    if (powers == 0) {
+        powers = 1;
+    }
+
+    for (uint8_t b = 0; b < bands; b++) {
+        for (uint8_t c = 0; c < chans; c++) {
+            const uint16_t f = cfg->freq[b][c];
+            vtxCustomFreq[b * chans + c] = f;
+            if (f) {
+                fmin = MIN(fmin, f);
+                fmax = MAX(fmax, f);
+            }
+        }
+    }
+    if (fmax == 0) {
+        fmin = VTX_CUSTOM_GRID_MIN_MHZ;
+        fmax = VTX_CUSTOM_GRID_MAX_MHZ;
+    }
+
+    vtxCustomPowerNames[0] = "---";
+    for (uint8_t i = 0; i < powers; i++) {
+        const uint16_t mw = cfg->powerMw[i] ? cfg->powerMw[i] : 25;
+        vtxCustomPowerLevels[i] = mw;
+        vtxCustomPowerDbm[i] = cfg->powerDbm[i];
+        if (cfg->powerCode[i] && cfg->powerCode[i] != mw) {
+            milliwatt = false;
+        }
+        if (mw >= 1000) {
+            tfp_snprintf(vtxCustomPowerNameBuf[i], sizeof(vtxCustomPowerNameBuf[i]), "%uW", mw / 1000);
+        } else {
+            tfp_snprintf(vtxCustomPowerNameBuf[i], sizeof(vtxCustomPowerNameBuf[i]), "%u", mw);
+        }
+        vtxCustomPowerNames[i + 1] = vtxCustomPowerNameBuf[i];
+    }
+
+    vtxCustomGrid.name = "CUSTOM";
+    vtxCustomGrid.trampMilliwatt = milliwatt;
+    vtxCustomGrid.freq = vtxCustomFreq;
+    vtxCustomGrid.bandNames = vtxCustomBandNames;
+    vtxCustomGrid.chanNames = vtxCustomChanNames;
+    vtxCustomGrid.powerNames = vtxCustomPowerNames;
+    vtxCustomGrid.powerLevels = vtxCustomPowerLevels;
+    vtxCustomGrid.powerDbm = vtxCustomPowerDbm;
+    vtxCustomGrid.bandCount = bands;
+    vtxCustomGrid.chanCount = chans;
+    vtxCustomGrid.powerCount = powers;
+    vtxCustomGrid.freqMin = fmin;
+    vtxCustomGrid.freqMax = fmax;
+    vtxCustomGridDirty = false;
+}
+
+/* Value put on the Tramp wire for power level `index` (1-based) of the active
+ * grid. Built-in SX33-type grids use the CLI-tunable scale codes, the CUSTOM
+ * grid uses its own per-level codes, everything else sends real milliwatts. */
+uint16_t vtx3G3_TrampPowerCode(uint8_t index, uint16_t milliwatt)
+{
+    if (vtx3G3_EffectiveGrid() == VTX_3G3_GRID_CUSTOM) {
+        const vtxCustomGridConfig_t *cfg = vtxCustomGridConfig();
+        if (index >= 1 && index <= VTX_CUSTOM_GRID_MAX_POWER && cfg->powerCode[index - 1]) {
+            return cfg->powerCode[index - 1];
+        }
+        return milliwatt;
+    }
+    if (!vtx3G3_TrampPowerIsMilliwatt() &&
+        index >= 1 && index <= ARRAYLEN(vtxConfig()->vtx3g3TrampPwrCode)) {
+        return vtxConfig()->vtx3g3TrampPwrCode[index - 1];
+    }
+    return milliwatt;
+}
+#endif
+
 static const vtx3G3GridInfo_t * vtx3G3_Grid(void)
 {
     const uint8_t grid = vtx3G3_EffectiveGrid();
+
+#if defined(USE_VTX_CONTROL)
+    if (grid == VTX_3G3_GRID_CUSTOM) {
+        if (vtxCustomGridDirty) {
+            vtx3G3_CustomGridRebuild();
+        }
+        return &vtxCustomGrid;
+    }
+#endif
 
     // AUTO never survives vtx3G3_EffectiveGrid(), but the enum value sits inside
     // the array bounds with no table row behind it.

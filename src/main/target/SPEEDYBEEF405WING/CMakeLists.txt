@@ -1,1 +1,1 @@
-target_stm32f405xg(SPEEDYBEEF405WING)
+target_stm32f405xg_intlog(SPEEDYBEEF405WING)

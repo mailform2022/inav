@@ -67,3 +67,5 @@ uint8_t vtx3G3_PowerDbm(uint8_t index);
 uint16_t vtx3G3_FreqMin(void);
 uint16_t vtx3G3_FreqMax(void);
 uint16_t vtx3G3_MaxPowerMw(void);
+void vtx3G3_CustomGridInvalidate(void);
+uint16_t vtx3G3_TrampPowerCode(uint8_t index, uint16_t milliwatt);

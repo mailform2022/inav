@@ -31,6 +31,7 @@
 #include "flash.h"
 #include "flash_m25p16.h"
 #include "flash_w25n01g.h"
+#include "flash_stm32f4_internal.h"
 
 #include "common/time.h"
 
@@ -70,6 +71,20 @@ static flashDriver_t flashDrivers[] = {
     },
 #endif
 
+#endif
+
+#if defined(USE_FLASH_INTERNAL) && defined(STM32F4)
+    {
+        .init = stm32f4intflash_init,
+        .isReady = stm32f4intflash_isReady,
+        .waitForReady = stm32f4intflash_waitForReady,
+        .eraseSector = stm32f4intflash_eraseSector,
+        .eraseCompletely = stm32f4intflash_eraseCompletely,
+        .pageProgram = stm32f4intflash_pageProgram,
+        .readBytes = stm32f4intflash_readBytes,
+        .getGeometry = stm32f4intflash_getGeometry,
+        .flush = stm32f4intflash_flush
+    },
 #endif
 
 };

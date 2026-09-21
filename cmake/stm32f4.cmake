@@ -119,6 +119,20 @@ function(target_stm32f405xg name)
     )
 endfunction()
 
+# F405 with flash sectors 9-10 reserved for the internal blackbox log (USE_FLASH_INTERNAL)
+function(target_stm32f405xg_intlog name)
+    target_stm32f4xx(
+        NAME ${name}
+        STARTUP startup_stm32f40xx.s
+        SOURCES ${STM32F4_STDPERIPH_SRC}
+        COMPILE_DEFINITIONS ${STM32F405_COMPILE_DEFINITIONS}
+        LINKER_SCRIPT stm32_flash_f405xg_intlog
+        SVD STM32F405
+        BOOTLOADER
+        ${ARGN}
+    )
+endfunction()
+
 set(STM32F411_OR_F427_STDPERIPH_SRC ${STM32F4_STDPERIPH_SRC})
 set(STM32F411_OR_F427_STDPERIPH_SRC_EXCLUDES "stm32f4xx_fsmc.c")
 exclude_basenames(STM32F411_OR_F427_STDPERIPH_SRC ${STM32F411_OR_F427_STDPERIPH_SRC_EXCLUDES})

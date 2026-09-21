@@ -26,6 +26,9 @@
 // Widest channel row of any supported grid (the 3.3GHz FF3.7 has 20 in one
 // band). Only vtx_channel accepts this range; each grid still validates its own.
 #define VTX_SETTINGS_MAX_CHANNEL_ANY 20
+// Widest band count of any grid (the CUSTOM grid allows 8 bands). Only vtx_band
+// and the RC map accept this range; each grid still validates its own.
+#define VTX_SETTINGS_MAX_BAND_ANY    8
 
 #define VTX_SETTINGS_BAND_COUNT     (VTX_SETTINGS_MAX_BAND - VTX_SETTINGS_MIN_BAND + 1)
 #define VTX_SETTINGS_CHANNEL_COUNT  (VTX_SETTINGS_MAX_CHANNEL - VTX_SETTINGS_MIN_CHANNEL + 1)

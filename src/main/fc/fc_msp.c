@@ -1691,6 +1691,31 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
         }
         break;
 
+    case MSP2_INAV_VTX_CUSTOM_GRID:
+        {
+            // Layout: maxBands maxChans maxPower bandCount chanCount powerCount,
+            // then freq[maxBands][maxChans] (u16), then per power level mW(u16) code(u16) dBm(u8).
+            // Writing goes through MSP2_INAV_SET_VTX_CUSTOM_GRID in blocks (see below).
+            const vtxCustomGridConfig_t *cfg = vtxCustomGridConfig();
+            sbufWriteU8(dst, VTX_CUSTOM_GRID_MAX_BANDS);
+            sbufWriteU8(dst, VTX_CUSTOM_GRID_MAX_CHANNELS);
+            sbufWriteU8(dst, VTX_CUSTOM_GRID_MAX_POWER);
+            sbufWriteU8(dst, cfg->bandCount);
+            sbufWriteU8(dst, cfg->chanCount);
+            sbufWriteU8(dst, cfg->powerCount);
+            for (int b = 0; b < VTX_CUSTOM_GRID_MAX_BANDS; b++) {
+                for (int c = 0; c < VTX_CUSTOM_GRID_MAX_CHANNELS; c++) {
+                    sbufWriteU16(dst, cfg->freq[b][c]);
+                }
+            }
+            for (int i = 0; i < VTX_CUSTOM_GRID_MAX_POWER; i++) {
+                sbufWriteU16(dst, cfg->powerMw[i]);
+                sbufWriteU16(dst, cfg->powerCode[i]);
+                sbufWriteU8(dst, cfg->powerDbm[i]);
+            }
+        }
+        break;
+
     case MSP2_INAV_VTX_TABLE_CUSTOM:
         {
             sbufWriteU8(dst, vtxSettingsConfig()->band);
@@ -2725,6 +2750,55 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
                     memset(entry, 0, sizeof(*entry));
                 }
             }
+        }
+        break;
+
+    case MSP2_INAV_SET_VTX_CUSTOM_GRID:
+        {
+            // The whole table does not fit one MSP frame (192-byte input buffer),
+            // so it is written in blocks selected by the first byte:
+            //   0xFF: bandCount chanCount powerCount, then powerCount x (mW u16, code u16, dBm u8)
+            //   0..7: band index, then chanCount x freq u16 for that band
+            const int powerEntryLen = 2 + 2 + 1;
+            vtxCustomGridConfig_t *cfg = vtxCustomGridConfigMutable();
+            if (dataSize < 1) {
+                return MSP_RESULT_ERROR;
+            }
+            const uint8_t block = sbufReadU8(src);
+            if (block == 0xFF) {
+                if (dataSize < 4) {
+                    return MSP_RESULT_ERROR;
+                }
+                const uint8_t bandCount = MIN(sbufReadU8(src), VTX_CUSTOM_GRID_MAX_BANDS);
+                const uint8_t chanCount = MIN(sbufReadU8(src), VTX_CUSTOM_GRID_MAX_CHANNELS);
+                const uint8_t powerCount = MIN(sbufReadU8(src), VTX_CUSTOM_GRID_MAX_POWER);
+                if ((int)dataSize != 4 + powerCount * powerEntryLen) {
+                    return MSP_RESULT_ERROR;
+                }
+                cfg->bandCount = bandCount;
+                cfg->chanCount = chanCount;
+                cfg->powerCount = powerCount;
+                for (int i = 0; i < VTX_CUSTOM_GRID_MAX_POWER; i++) {
+                    if (i < powerCount) {
+                        cfg->powerMw[i] = sbufReadU16(src);
+                        cfg->powerCode[i] = sbufReadU16(src);
+                        cfg->powerDbm[i] = sbufReadU8(src);
+                    } else {
+                        cfg->powerMw[i] = 0;
+                        cfg->powerCode[i] = 0;
+                        cfg->powerDbm[i] = 0;
+                    }
+                }
+            } else {
+                if (block >= VTX_CUSTOM_GRID_MAX_BANDS || (int)dataSize != 1 + cfg->chanCount * 2) {
+                    return MSP_RESULT_ERROR;
+                }
+                for (int c = 0; c < VTX_CUSTOM_GRID_MAX_CHANNELS; c++) {
+                    uint16_t f = c < cfg->chanCount ? sbufReadU16(src) : 0;
+                    cfg->freq[block][c] = (f == 0 || (f >= VTX_CUSTOM_GRID_MIN_MHZ && f <= VTX_CUSTOM_GRID_MAX_MHZ)) ? f : 0;
+                }
+            }
+            vtx3G3_CustomGridInvalidate();
         }
         break;
 #endif

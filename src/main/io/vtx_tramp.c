@@ -42,6 +42,7 @@
 #include "io/vtx_control.h"
 #include "io/vtx.h"
 #include "io/vtx_string.h"
+#include "io/vtx_trace.h"
 
 #define VTX_PKT_SIZE                16
 #define VTX_PROTO_STATE_TIMEOUT_MS  1000
@@ -148,6 +149,9 @@ static bool vtxProtoRecv(void)
     uint8_t * bufPtr = (uint8_t*)&vtxState.recvPkt;
     while (serialRxBytesWaiting(vtxState.port)) {
         const uint8_t c = serialRead(vtxState.port);
+#ifdef USE_VTX_TRACE
+        vtxTraceRxByte(VTX_TRACE_PROTO_TRAMP, c);
+#endif
 
         if (vtxState.recvPtr == 0) {
             // Wait for sync byte
@@ -205,6 +209,9 @@ static void vtxProtoSend(uint8_t cmd, uint16_t param)
 
     // Send data 
     serialWriteBuf(vtxState.port, (uint8_t *)&vtxState.sendPkt, sizeof(vtxState.sendPkt));
+#ifdef USE_VTX_TRACE
+    vtxTraceTx(VTX_TRACE_PROTO_TRAMP, vtxState.sendPkt, sizeof(vtxState.sendPkt));
+#endif
 
     // Reset cmd response state
     vtxState.recvPtr = 0;
@@ -514,12 +521,11 @@ static void impl_SetPowerByIndex(vtxDevice_t * vtxDevice, uint8_t index)
     // reports 0 for the lowest, but a 0 set-command means pit/off). Map those
     // 3G3 grids to the device codes; grids that speak plain Tramp mW, and all
     // other frequency groups, send mW unchanged.
-    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 &&
-        index <= ARRAYLEN(vtxConfig()->vtx3g3TrampPwrCode) &&
-        !vtx3G3_TrampPowerIsMilliwatt()) {
-        // Device-scale codes are CLI-tunable (vtx_3g3_tramp_pwr1/2/3) because
-        // some SX33 units do not reach true max output with the default code.
-        vtxState.request.devicePower = vtxConfig()->vtx3g3TrampPwrCode[index - 1];
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3) {
+        // Device-scale codes are CLI-tunable (vtx_3g3_tramp_pwr1/2/3, or per
+        // level in `vtxgrid power` for the CUSTOM grid) because some SX33 units
+        // do not reach true max output with the default code.
+        vtxState.request.devicePower = vtx3G3_TrampPowerCode(index, vtxState.request.power);
     } else {
         vtxState.request.devicePower = vtxState.request.power;
     }

@@ -71,6 +71,7 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
 );
 
 PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 1);
+PG_REGISTER(vtxCustomGridConfig_t, vtxCustomGridConfig, PG_VTX_CUSTOM_GRID, 0);
 
 static uint8_t locked = 0;
 
@@ -168,7 +169,7 @@ void vtxUpdateRcMap(void)
 
         if (index != appliedEntry) {
             appliedEntry = index;
-            vtxSettingsConfigMutable()->band = constrain(entry->band, VTX_SETTINGS_MIN_BAND, VTX_SETTINGS_MAX_BAND);
+            vtxSettingsConfigMutable()->band = constrain(entry->band, VTX_SETTINGS_MIN_BAND, VTX_SETTINGS_MAX_BAND_ANY);
             vtxSettingsConfigMutable()->channel = constrain(entry->channel, VTX_SETTINGS_MIN_CHANNEL, VTX_SETTINGS_MAX_CHANNEL_ANY);
             if (entry->power) {
                 vtxSettingsConfigMutable()->power = entry->power;

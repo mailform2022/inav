@@ -71,6 +71,7 @@ bool cliMode = false;
 #include "drivers/usb_msc.h"
 #include "drivers/vtx_common.h"
 #include "io/vtx.h"
+#include "io/vtx_trace.h"
 #include "io/vtx_control.h"
 #include "io/vtx_string.h"
 #include "io/vtx_smartaudio.h"
@@ -2222,7 +2223,7 @@ static void cliVtxMap(char *cmdline)
 
     if (args[INDEX] < 0 || args[INDEX] >= MAX_VTX_RC_MAP_ENTRIES ||
         args[RC_CHANNEL] < 0 || args[RC_CHANNEL] > VTX_RC_MAP_CHANNEL_COUNT ||
-        args[BAND] < 0 || args[BAND] > VTX_SETTINGS_MAX_BAND ||
+        args[BAND] < 0 || args[BAND] > VTX_SETTINGS_MAX_BAND_ANY ||
         args[CHANNEL] < 0 || args[CHANNEL] > VTX_SETTINGS_MAX_CHANNEL_ANY ||
         args[POWER] < 0 || args[POWER] > VTX_RC_MAP_MAX_POWER ||
         args[RANGE_START] < 0 || args[RANGE_START] > 2500 ||
@@ -2240,6 +2241,172 @@ static void cliVtxMap(char *cmdline)
     entry->rangeEnd = args[RANGE_END];
 
     printVtxMap(DUMP_MASTER, vtxRcMapEntries(0), NULL);
+}
+#endif
+
+#if defined(USE_VTX_CONTROL)
+// Custom VTX grid. Dumped as a `reset` followed by one line per band row and
+// per power level, so pasting a diff back rebuilds the table exactly.
+static void printVtxGrid(uint8_t dumpMask, const vtxCustomGridConfig_t *cfg, const vtxCustomGridConfig_t *defaultCfg)
+{
+    if (defaultCfg && (dumpMask & DO_DIFF) && memcmp(cfg, defaultCfg, sizeof(*cfg)) == 0) {
+        return;
+    }
+
+    cliDumpPrintLinef(dumpMask, false, "vtxgrid reset");
+    const uint8_t chans = MIN(cfg->chanCount, VTX_CUSTOM_GRID_MAX_CHANNELS);
+    for (uint8_t b = 0; b < MIN(cfg->bandCount, VTX_CUSTOM_GRID_MAX_BANDS); b++) {
+        cliPrintf("vtxgrid band %u", b + 1);
+        for (uint8_t c = 0; c < chans; c++) {
+            cliPrintf(" %u", cfg->freq[b][c]);
+        }
+        cliPrintLinefeed();
+    }
+    for (uint8_t i = 0; i < MIN(cfg->powerCount, VTX_CUSTOM_GRID_MAX_POWER); i++) {
+        cliPrintLinef("vtxgrid power %u %u %u %u", i + 1, cfg->powerMw[i], cfg->powerCode[i], cfg->powerDbm[i]);
+    }
+}
+
+static void cliVtxGrid(char *cmdline)
+{
+    char *saveptr;
+    vtxCustomGridConfig_t *cfg = vtxCustomGridConfigMutable();
+
+    if (isEmpty(cmdline)) {
+        printVtxGrid(DUMP_MASTER, cfg, NULL);
+        cliPrintLinef("# %u bands x %u channels, %u power levels, %u-%u MHz",
+            cfg->bandCount, cfg->chanCount, cfg->powerCount,
+            vtx3G3_EffectiveGrid() == VTX_3G3_GRID_CUSTOM ? vtx3G3_FreqMin() : 0,
+            vtx3G3_EffectiveGrid() == VTX_3G3_GRID_CUSTOM ? vtx3G3_FreqMax() : 0);
+        return;
+    }
+
+    char *cmd = strtok_r(cmdline, " ", &saveptr);
+    if (cmd == NULL) {
+        cliShowParseError();
+        return;
+    }
+
+    if (sl_strncasecmp(cmd, "reset", 5) == 0) {
+        memset(cfg, 0, sizeof(*cfg));
+        vtx3G3_CustomGridInvalidate();
+        return;
+    }
+
+    if (sl_strncasecmp(cmd, "band", 4) == 0) {
+        char *ptr = strtok_r(NULL, " ", &saveptr);
+        const int band = ptr ? fastA2I(ptr) : 0;
+        if (band < 1 || band > VTX_CUSTOM_GRID_MAX_BANDS) {
+            cliShowParseError();
+            return;
+        }
+        uint16_t row[VTX_CUSTOM_GRID_MAX_CHANNELS];
+        uint8_t count = 0;
+        while ((ptr = strtok_r(NULL, " ", &saveptr)) != NULL) {
+            const int f = fastA2I(ptr);
+            if (count >= VTX_CUSTOM_GRID_MAX_CHANNELS ||
+                (f != 0 && (f < VTX_CUSTOM_GRID_MIN_MHZ || f > VTX_CUSTOM_GRID_MAX_MHZ))) {
+                cliShowParseError();
+                return;
+            }
+            row[count++] = f;
+        }
+        if (count == 0 || (cfg->chanCount != 0 && count != cfg->chanCount)) {
+            cliPrintErrorLinef("every band must have %u channels (use `vtxgrid reset` to change)", cfg->chanCount);
+            return;
+        }
+        memset(cfg->freq[band - 1], 0, sizeof(cfg->freq[band - 1]));
+        memcpy(cfg->freq[band - 1], row, count * sizeof(row[0]));
+        cfg->chanCount = count;
+        if (band > cfg->bandCount) {
+            cfg->bandCount = band;
+        }
+        vtx3G3_CustomGridInvalidate();
+        printVtxGrid(DUMP_MASTER, cfg, NULL);
+        return;
+    }
+
+    if (sl_strncasecmp(cmd, "power", 5) == 0) {
+        int args[4] = { 0, 0, 0, 0 };
+        int check = 0;
+        char *ptr;
+        while ((ptr = strtok_r(NULL, " ", &saveptr)) != NULL && check < 4) {
+            args[check++] = fastA2I(ptr);
+        }
+        if (ptr != NULL || check < 2 ||
+            args[0] < 1 || args[0] > VTX_CUSTOM_GRID_MAX_POWER ||
+            args[1] < 1 || args[1] > 65535 ||
+            args[2] < 0 || args[2] > 65535 ||
+            args[3] < 0 || args[3] > 255) {
+            cliShowParseError();
+            return;
+        }
+        cfg->powerMw[args[0] - 1] = args[1];
+        cfg->powerCode[args[0] - 1] = args[2];
+        cfg->powerDbm[args[0] - 1] = args[3];
+        if (args[0] > cfg->powerCount) {
+            cfg->powerCount = args[0];
+        }
+        vtx3G3_CustomGridInvalidate();
+        printVtxGrid(DUMP_MASTER, cfg, NULL);
+        return;
+    }
+
+    cliShowParseError();
+}
+#endif
+
+#ifdef USE_VTX_TRACE
+// Raw VTX serial trace. One line per frame:
+//   <ms> <TRAMP|SA> <TX|RX> [x<repeats>] <hex bytes>
+// Paste the whole output into a file next to the blackbox log.
+static void cliVtxTrace(char *cmdline)
+{
+    if (sl_strncasecmp(cmdline, "clear", 5) == 0) {
+        vtxTraceClear();
+        cliPrintLine("vtxtrace cleared");
+        return;
+    }
+    if (sl_strncasecmp(cmdline, "on", 2) == 0) {
+        vtxTraceSetEnabled(true);
+        cliPrintLine("vtxtrace on");
+        return;
+    }
+    if (sl_strncasecmp(cmdline, "off", 3) == 0) {
+        vtxTraceSetEnabled(false);
+        cliPrintLine("vtxtrace off");
+        return;
+    }
+
+    static const char * const protoNames[] = { "TRAMP", "SA" };
+
+    vtxTraceUpdate(millis());
+    const vtxTraceStats_t *st = vtxTraceStats();
+    vtxDevice_t *vtxDevice = vtxCommonDevice();
+    cliPrintLinef("# vtxtrace %s records=%u dropped=%u tx=%u rx=%u vtx_dev=%d group=%d grid=%s now=%u",
+        st->enabled ? "on" : "off", st->records, st->dropped, st->txBytes, st->rxBytes,
+        vtxDevice ? vtxCommonGetDeviceType(vtxDevice) : 0, vtxSettingsConfig()->frequencyGroup,
+#if defined(USE_VTX_CONTROL)
+        vtx3G3_GridName(),
+#else
+        "-",
+#endif
+        millis());
+
+    vtxTraceRecord_t rec;
+    for (uint32_t i = 0; vtxTraceGet(i, &rec); i++) {
+        cliPrintf("%u %s %s", rec.timeMs,
+            rec.proto < ARRAYLEN(protoNames) ? protoNames[rec.proto] : "?",
+            rec.dir == VTX_TRACE_DIR_TX ? "TX" : "RX");
+        if (rec.repeats) {
+            cliPrintf(" x%u", rec.repeats + 1);
+        }
+        for (uint8_t b = 0; b < rec.len; b++) {
+            cliPrintf(" %02X", rec.data[b]);
+        }
+        cliPrintLinefeed();
+    }
+    cliPrintLine("# end vtxtrace");
 }
 #endif
 
@@ -4444,6 +4611,9 @@ static void printConfig(const char *cmdline, bool doDiff)
 #if defined(USE_VTX_CONTROL)
         cliPrintHashLine("VTX: RC channel map [vtxmap]");
         printVtxMap(dumpMask, vtxRcMapEntries_CopyArray, vtxRcMapEntries(0));
+
+        cliPrintHashLine("VTX: custom grid [vtxgrid]");
+        printVtxGrid(dumpMask, &vtxCustomGridConfig_Copy, vtxCustomGridConfig());
 #endif
 
 #ifdef USE_PROGRAMMING_FRAMEWORK
@@ -4688,6 +4858,13 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("vtxmap", "map an RC channel value to a VTX band/channel",
         "<index> <rc channel 1-16> <band> <channel> <power, 0 keeps current> <range start us> <range end us>\r\n"
         "\treset\r\n", cliVtxMap),
+    CLI_COMMAND_DEF("vtxgrid", "user VTX frequency table for vtx_3g3_grid = CUSTOM",
+        "band <1-8> <MHz per channel, up to 20>\r\n"
+        "\tpower <1-8> <mW> [tramp code, 0 = mW] [dBm]\r\n"
+        "\treset\r\n", cliVtxGrid),
+#endif
+#ifdef USE_VTX_TRACE
+    CLI_COMMAND_DEF("vtxtrace", "dump raw VTX serial exchange", "[clear|on|off]", cliVtxTrace),
 #endif
 #ifdef USE_PROGRAMMING_FRAMEWORK
     CLI_COMMAND_DEF("logic", "configure logic conditions",

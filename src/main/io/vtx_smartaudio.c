@@ -50,6 +50,7 @@
 #include "io/vtx_control.h"
 #include "io/vtx_smartaudio.h"
 #include "io/vtx_string.h"
+#include "io/vtx_trace.h"
 
 
 // Timing parameters
@@ -564,6 +565,9 @@ static void saSendFrame(uint8_t *buf, int len)
     for (int i = 0 ; i < len ; i++) {
         serialWrite(smartAudioSerialPort, buf[i]);
     }
+#ifdef USE_VTX_TRACE
+    vtxTraceTx(VTX_TRACE_PROTO_SMARTAUDIO, buf, len);
+#endif
 
     // XXX: Workaround for early AKK SAudio-enabled VTX bug,
     // shouldn't cause any problems with VTX with properly
@@ -809,6 +813,9 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
 
     while (serialRxBytesWaiting(smartAudioSerialPort) > 0) {
         uint8_t c = serialRead(smartAudioSerialPort);
+#ifdef USE_VTX_TRACE
+        vtxTraceRxByte(VTX_TRACE_PROTO_SMARTAUDIO, c);
+#endif
         saReceiveFramer((uint16_t)c);
     }
 
@@ -1005,6 +1012,9 @@ static void sa3G3SendChannel(uint8_t band, uint8_t channel)
         while (!isSerialTransmitBufferEmpty(smartAudioSerialPort)) { /* drain */ }
         delay(interByteMs);
     }
+#ifdef USE_VTX_TRACE
+    vtxTraceTx(VTX_TRACE_PROTO_SMARTAUDIO, buf, sizeof(buf));
+#endif
     sa_lastTransmissionMs = millis();
     saStat.pktsent++;
     sa3G3TxTotal++;
