@@ -119,31 +119,55 @@ bool flashIsReady(void)
 
 bool flashWaitForReady(timeMs_t timeoutMillis)
 {
+    if (flash == NULL) {
+        return false;
+    }
+
     return flash->waitForReady(timeoutMillis);
 }
 
 void flashEraseSector(uint32_t address)
 {
+    if (flash == NULL) {
+        return;
+    }
+
     flash->eraseSector(address);
 }
 
 void flashEraseCompletely(void)
 {
+    if (flash == NULL) {
+        return;
+    }
+
     flash->eraseCompletely();
 }
 
 uint32_t flashPageProgram(uint32_t address, const uint8_t *data, int length)
 {
+    if (flash == NULL) {
+        return address;
+    }
+
     return flash->pageProgram(address, data, length);
 }
 
 int flashReadBytes(uint32_t address, uint8_t *buffer, int length)
 {
+    if (flash == NULL) {
+        return 0;
+    }
+
     return flash->readBytes(address, buffer, length);
 }
 
 void flashFlush(void)
 {
+    if (flash == NULL || flash->flush == NULL) {
+        return;
+    }
+
     flash->flush();
 }
 
@@ -184,6 +208,13 @@ static __attribute__((unused)) void createPartition(flashPartitionType_e type, u
         partitionSectors++; // needs a portion of a sector.
     }
 
+    if (partitionSectors > *endSector + 1) {
+        // Device too small for this partition (e.g. a 256 KB internal-flash log
+        // device can not hold a 1 MB firmware backup); leave it out so the
+        // sector arithmetic below does not wrap and swallow the FLASHFS partition.
+        return;
+    }
+
     flashSector_t startSector = (*endSector + 1) - partitionSectors; // + 1 for inclusive
 
     flashPartitionSet(type, startSector, *endSector);
@@ -211,9 +242,13 @@ static void flashConfigurePartitions(void)
 #endif
 
 #if defined(MSP_FIRMWARE_UPDATE)
-    createPartition(FLASH_PARTITION_TYPE_FIRMWARE_UPDATE_META, flashGeometry->sectorSize, &endSector);
-    createPartition(FLASH_PARTITION_TYPE_UPDATE_FIRMWARE, MCU_FLASH_SIZE * 1024, &endSector);
-    createPartition(FLASH_PARTITION_TYPE_FULL_BACKUP, MCU_FLASH_SIZE * 1024, &endSector);
+    // The update/backup partitions each need a full MCU image; a small device
+    // (the internal-flash log) keeps all of its space for FLASHFS instead.
+    if ((uint64_t)(endSector + 1) * flashGeometry->sectorSize >= 2ULL * MCU_FLASH_SIZE * 1024 + flashGeometry->sectorSize) {
+        createPartition(FLASH_PARTITION_TYPE_FIRMWARE_UPDATE_META, flashGeometry->sectorSize, &endSector);
+        createPartition(FLASH_PARTITION_TYPE_UPDATE_FIRMWARE, MCU_FLASH_SIZE * 1024, &endSector);
+        createPartition(FLASH_PARTITION_TYPE_FULL_BACKUP, MCU_FLASH_SIZE * 1024, &endSector);
+    }
 #endif
 
 #if defined(CONFIG_IN_EXTERNAL_FLASH)
