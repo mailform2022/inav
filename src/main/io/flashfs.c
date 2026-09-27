@@ -71,6 +71,10 @@ static void flashfsSetTailAddress(uint32_t address)
 
 void flashfsEraseCompletely(void)
 {
+    if (!flashPartition) {
+        return;
+    }
+
     flashPartitionErase(flashPartition);
     flashfsClearBuffer();
     flashfsSetTailAddress(0);
@@ -130,6 +134,10 @@ bool flashfsIsReady(void)
 
 uint32_t flashfsGetSize(void)
 {
+    if (!flashPartition) {
+        return 0;
+    }
+
     return flashPartitionSize(flashPartition);
 }
 
@@ -481,7 +489,10 @@ int flashfsReadAbs(uint32_t address, uint8_t *buffer, unsigned int len)
     int bytesRead;
 
     // Did caller try to read past the end of the volume?
-    if (address + len > flashfsGetSize()) {
+    if (address >= flashfsGetSize()) {
+        return 0;
+    }
+    if (len > flashfsGetSize() - address) {
         // Truncate their request
         len = flashfsGetSize() - address;
     }

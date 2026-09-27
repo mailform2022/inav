@@ -42,6 +42,9 @@ typedef struct blackboxConfig_s {
     uint8_t device;
     uint8_t invertedCardDetection;
     uint32_t includeFlags;
+    uint16_t slow_after;        // seconds of logging after which the rate drops to slow_rate_denom (0 = never)
+    uint16_t slow_rate_denom;   // denominator used once slow_after has elapsed
+    uint16_t flash_min_free;    // KB; the flash log is erased on arming when less than this is free (0 = never)
 } blackboxConfig_t;
 
 PG_DECLARE(blackboxConfig_t, blackboxConfig);
@@ -49,6 +52,8 @@ PG_DECLARE(blackboxConfig_t, blackboxConfig);
 void blackboxLogEvent(FlightLogEvent event, flightLogEventData_t *data);
 
 void blackboxInit(void);
+// Called right before arming: makes room on the flash log if it is nearly full.
+void blackboxPrepareArming(void);
 void blackboxUpdate(timeUs_t currentTimeUs);
 void blackboxStart(void);
 void blackboxFinish(void);

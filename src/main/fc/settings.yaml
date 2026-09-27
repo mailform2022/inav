@@ -743,6 +743,24 @@ groups:
         default_value: :target
         field: device
         table: blackbox_device
+      - name: blackbox_slow_after
+        description: "Seconds after the start of every log during which the configured blackbox rate is used. After that only every blackbox_slow_rate_denom-th loop is logged, so the launch is detailed and the rest of the flight still fits a small flash. 0 = keep the configured rate for the whole log."
+        default_value: 0
+        field: slow_after
+        min: 0
+        max: 3600
+      - name: blackbox_slow_rate_denom
+        description: "Blackbox rate denominator used once blackbox_slow_after has elapsed (numerator stays blackbox_rate_num). Never lower than blackbox_rate_denom."
+        default_value: 128
+        field: slow_rate_denom
+        min: 1
+        max: 65535
+      - name: blackbox_flash_min_free
+        description: "Kilobytes of flash log space that must be free when arming. If less is free the whole flash log is erased right before arming (while still disarmed; the MCU pauses for a few seconds on internal flash). Older logs are kept as long as this much room remains. 0 = never erase automatically."
+        default_value: 0
+        field: flash_min_free
+        min: 0
+        max: 65535
       - name: sdcard_detect_inverted
         description: "This setting drives the way SD card is detected in card slot. On some targets (AnyFC F7 clone) different card slot was used and depending of hardware revision ON or OFF setting might be required. If card is not detected, change this value."
         default_value: :target

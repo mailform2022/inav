@@ -64,6 +64,7 @@
 #include "flight/rpm_filter.h"
 
 #include "io/beeper.h"
+#include "io/flashfs.h"
 #include "io/gps.h"
 
 #include "navigation/navigation.h"
@@ -100,12 +101,15 @@
 #define BLACKBOX_INVERTED_CARD_DETECTION 0
 #endif
 
-PG_REGISTER_WITH_RESET_TEMPLATE(blackboxConfig_t, blackboxConfig, PG_BLACKBOX_CONFIG, 2);
+PG_REGISTER_WITH_RESET_TEMPLATE(blackboxConfig_t, blackboxConfig, PG_BLACKBOX_CONFIG, 3);
 
 PG_RESET_TEMPLATE(blackboxConfig_t, blackboxConfig,
     .device = DEFAULT_BLACKBOX_DEVICE,
     .rate_num = SETTING_BLACKBOX_RATE_NUM_DEFAULT,
     .rate_denom = SETTING_BLACKBOX_RATE_DENOM_DEFAULT,
+    .slow_after = SETTING_BLACKBOX_SLOW_AFTER_DEFAULT,
+    .slow_rate_denom = SETTING_BLACKBOX_SLOW_RATE_DENOM_DEFAULT,
+    .flash_min_free = SETTING_BLACKBOX_FLASH_MIN_FREE_DEFAULT,
     .invertedCardDetection = BLACKBOX_INVERTED_CARD_DETECTION,
     .includeFlags = BLACKBOX_FEATURE_NAV_PID | BLACKBOX_FEATURE_NAV_POS |
         BLACKBOX_FEATURE_MAG | BLACKBOX_FEATURE_ACC | BLACKBOX_FEATURE_ATTITUDE |
@@ -587,6 +591,10 @@ static uint64_t blackboxConditionCache;
 STATIC_ASSERT((sizeof(blackboxConditionCache) * 8) >= FLIGHT_LOG_FIELD_CONDITION_LAST, too_many_flight_log_conditions);
 
 static uint32_t blackboxIFrameInterval;
+// P-frame denominator in effect (rate_denom, or slow_rate_denom once slow_after elapsed)
+static uint16_t blackboxActiveRateDenom = 1;
+static bool blackboxSlowPhase;
+static timeMs_t blackboxRunningSinceMs;
 static uint32_t blackboxIteration;
 static uint16_t blackboxPFrameIndex;
 static uint16_t blackboxIFrameIndex;
@@ -621,7 +629,17 @@ bool blackboxMayEditConfig(void)
 
 static bool blackboxIsOnlyLoggingIntraframes(void)
 {
-    return blackboxConfig()->rate_num == 1 && blackboxConfig()->rate_denom == blackboxIFrameInterval;
+    return blackboxConfig()->rate_num == 1 && blackboxActiveRateDenom == blackboxIFrameInterval;
+}
+
+static void blackboxSetIFrameInterval(uint16_t denom)
+{
+    if (denom <= 32) {
+        blackboxIFrameInterval = 32;
+    } else {
+        // Use next higher power of two via GCC builtin
+        blackboxIFrameInterval = 1 << (32 - __builtin_clz(denom - 1));
+    }
 }
 
 static bool testBlackboxConditionUncached(FlightLogFieldCondition condition)
@@ -1494,6 +1512,10 @@ void blackboxStart(void)
 
     blackboxResetIterationTimers();
 
+    blackboxActiveRateDenom = blackboxConfig()->rate_denom;
+    blackboxSlowPhase = false;
+    blackboxSetIFrameInterval(blackboxActiveRateDenom);
+
     /*
      * Record the beeper's current idea of the last arming beep time, so that we can detect it changing when
      * it finally plays the beep for this arming event.
@@ -1507,7 +1529,7 @@ void blackboxStart(void)
 #ifdef USE_VTX_TRACE
 // Text budget for the raw VTX exchange appended to each log. Decoders stop at
 // the "End of log" event, so this lives in the raw dump only (grep "^V ").
-#define BLACKBOX_VTX_TRACE_BUDGET 12288
+#define BLACKBOX_VTX_TRACE_BUDGET 4096
 
 /* Append the raw VTX serial exchange (oldest first, most recent kept when the
  * budget runs out) after the end-of-log marker, so a crash log also carries
@@ -2094,7 +2116,33 @@ static bool blackboxShouldLogPFrame(uint32_t pFrameIndex)
     /* Adding a magic shift of "blackboxConfig()->rate_num - 1" in here creates a better spread of
      * recorded / skipped frames when the I frame's position is considered:
      */
-    return (pFrameIndex + blackboxConfig()->rate_num - 1) % blackboxConfig()->rate_denom < blackboxConfig()->rate_num;
+    return (pFrameIndex + blackboxConfig()->rate_num - 1) % blackboxActiveRateDenom < blackboxConfig()->rate_num;
+}
+
+/* Two-speed logging on a small flash: the first slow_after seconds of every
+ * log (launch) keep the configured rate, then only every slow_rate_denom-th
+ * loop is logged so the rest of the flight still fits. Decoders reconstruct
+ * time from the frame's own timestamp, so switching at an I-frame boundary
+ * keeps the log readable. */
+static void blackboxUpdateRatePhase(void)
+{
+    if (blackboxSlowPhase || blackboxConfig()->slow_after == 0 || blackboxPFrameIndex != 0) {
+        return;
+    }
+    if (millis() - blackboxRunningSinceMs < (timeMs_t)blackboxConfig()->slow_after * 1000) {
+        return;
+    }
+
+    uint16_t denom = blackboxConfig()->slow_rate_denom;
+    if (denom <= blackboxConfig()->rate_num) {
+        denom = blackboxConfig()->rate_num + 1;
+    }
+    if (denom < blackboxConfig()->rate_denom) {
+        denom = blackboxConfig()->rate_denom;
+    }
+    blackboxActiveRateDenom = denom;
+    blackboxSetIFrameInterval(denom);
+    blackboxSlowPhase = true;
 }
 
 static bool blackboxShouldLogIFrame(void)
@@ -2251,6 +2299,7 @@ void blackboxUpdate(timeUs_t currentTimeUs)
              * could wipe out the end of the header if we weren't careful)
              */
             if (blackboxDeviceFlushForce()) {
+                blackboxRunningSinceMs = millis();
                 blackboxSetState(BLACKBOX_STATE_RUNNING);
             }
         }
@@ -2277,6 +2326,7 @@ void blackboxUpdate(timeUs_t currentTimeUs)
         if (blackboxModeActivationConditionPresent && !IS_RC_MODE_ACTIVE(BOXBLACKBOX)) {
             blackboxSetState(BLACKBOX_STATE_PAUSED);
         } else {
+            blackboxUpdateRatePhase();
             blackboxLogIteration(currentTimeUs);
         }
         blackboxAdvanceIterationTimers();
@@ -2326,12 +2376,30 @@ void blackboxInit(void)
         blackboxConfigMutable()->rate_denom = max_denom;
     }
     /* Decide on how ofter are we going to log I-frames*/
-    if (blackboxConfig()->rate_denom <= 32) {
-        blackboxIFrameInterval = 32;
+    blackboxActiveRateDenom = blackboxConfig()->rate_denom;
+    blackboxSetIFrameInterval(blackboxActiveRateDenom);
+}
+
+void blackboxPrepareArming(void)
+{
+#ifdef USE_FLASHFS
+    if (blackboxState != BLACKBOX_STATE_STOPPED || blackboxConfig()->device != BLACKBOX_DEVICE_FLASH
+        || blackboxConfig()->flash_min_free == 0) {
+        return;
     }
-    else {
-            // Use next higher power of two via GCC builtin
-        blackboxIFrameInterval = 1 << (32 - __builtin_clz (blackboxConfig()->rate_denom - 1));
+
+    const uint32_t size = flashfsGetSize();
+    const uint32_t used = flashfsGetOffset();
+    if (size == 0) {
+        return;
     }
+
+    // Internal-flash erase stalls the MCU for a few seconds, which is only
+    // acceptable on the ground: this runs while still disarmed. Logs from the
+    // previous session are kept as long as enough space remains for this one.
+    if (size - MIN(used, size) < (uint32_t)blackboxConfig()->flash_min_free * 1024) {
+        flashfsEraseCompletely();
+    }
+#endif
 }
 #endif

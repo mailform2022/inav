@@ -532,6 +532,16 @@ Selection of where to write blackbox data
 
 ---
 
+### blackbox_flash_min_free
+
+Kilobytes of flash log space that must be free when arming. If less is free the whole flash log is erased right before arming (while still disarmed; the MCU pauses for a few seconds on internal flash). Older logs are kept as long as this much room remains. 0 = never erase automatically.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 65535 |
+
+---
+
 ### blackbox_rate_denom
 
 Blackbox logging rate denominator. See blackbox_rate_num.
@@ -549,6 +559,26 @@ Blackbox logging rate numerator. Use num/denom settings to decide if a frame sho
 | Default | Min | Max |
 | --- | --- | --- |
 | 1 | 1 | 65535 |
+
+---
+
+### blackbox_slow_after
+
+Seconds after the start of every log during which the configured blackbox rate is used. After that only every blackbox_slow_rate_denom-th loop is logged, so the launch is detailed and the rest of the flight still fits a small flash. 0 = keep the configured rate for the whole log.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 3600 |
+
+---
+
+### blackbox_slow_rate_denom
+
+Blackbox rate denominator used once blackbox_slow_after has elapsed (numerator stays blackbox_rate_num). Never lower than blackbox_rate_denom.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 128 | 1 | 65535 |
 
 ---
 
