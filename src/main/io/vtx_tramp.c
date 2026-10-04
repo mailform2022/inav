@@ -42,7 +42,6 @@
 #include "io/vtx_control.h"
 #include "io/vtx.h"
 #include "io/vtx_string.h"
-#include "io/vtx_trace.h"
 
 #define VTX_PKT_SIZE                16
 #define VTX_PROTO_STATE_TIMEOUT_MS  1000
@@ -60,6 +59,7 @@
 #define VTX_PROTO_BOOT_SETTLE_MS    1000
 
 #define VTX_UPDATE_REQ_NONE         0x00
+#define VTX_FREQ_MAX_REASSERTS      3
 #define VTX_UPDATE_REQ_FREQUENCY    0x01
 #define VTX_UPDATE_REQ_POWER        0x02
 #define VTX_UPDATE_REQ_PITMODE      0x04
@@ -105,6 +105,7 @@ typedef struct {
         unsigned freq;
         unsigned power;        // Power in mW (for OSD/CLI display)
         unsigned devicePower;  // Value actually sent to the VTX in the power command
+        uint8_t  freqReasserts; // Frequency re-sends triggered by a mismatching read-back
     } request;
 
     // Actual VTX state: updated from actual VTX
@@ -149,9 +150,6 @@ static bool vtxProtoRecv(void)
     uint8_t * bufPtr = (uint8_t*)&vtxState.recvPkt;
     while (serialRxBytesWaiting(vtxState.port)) {
         const uint8_t c = serialRead(vtxState.port);
-#ifdef USE_VTX_TRACE
-        vtxTraceRxByte(VTX_TRACE_PROTO_TRAMP, c);
-#endif
 
         if (vtxState.recvPtr == 0) {
             // Wait for sync byte
@@ -209,9 +207,6 @@ static void vtxProtoSend(uint8_t cmd, uint16_t param)
 
     // Send data 
     serialWriteBuf(vtxState.port, (uint8_t *)&vtxState.sendPkt, sizeof(vtxState.sendPkt));
-#ifdef USE_VTX_TRACE
-    vtxTraceTx(VTX_TRACE_PROTO_TRAMP, vtxState.sendPkt, sizeof(vtxState.sendPkt));
-#endif
 
     // Reset cmd response state
     vtxState.recvPtr = 0;
@@ -311,7 +306,12 @@ static void vtxProtoSetPitMode(uint16_t mode)
 
 static bool vtxPowerReadbackComparable(void)
 {
-    return !(vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && !vtx3G3_TrampPowerIsMilliwatt());
+    if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && !vtx3G3_TrampPowerIsMilliwatt()) {
+        return false;
+    }
+    // A 0 mW command is a device mode (T4137W4: slow power ramp-up), and the
+    // status reports the ramp's target power, never 0.
+    return vtxState.request.devicePower != 0;
 }
 
 static void vtxProtoSetPower(uint16_t power)
@@ -426,7 +426,13 @@ static void impl_Process(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
                     // frequency request would be re-queued on every status cycle and
                     // permanently starve the power command (channel switches, power
                     // never does).
-                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_FREQUENCY) && (vtxState.state.freq != 0) && (vtxState.state.freq != vtxState.request.freq)) {
+                    // Bounded: a unit that cannot take the frequency (e.g. a
+                    // grid/device mismatch) keeps reporting its own, and an
+                    // unbounded re-send every status cycle would blink the video
+                    // forever.
+                    if (!(vtxState.updateReqMask & VTX_UPDATE_REQ_FREQUENCY) && (vtxState.state.freq != 0) && (vtxState.state.freq != vtxState.request.freq) &&
+                        (vtxState.request.freqReasserts < VTX_FREQ_MAX_REASSERTS)) {
+                        vtxState.request.freqReasserts++;
                         vtxState.updateReqMask |= VTX_UPDATE_REQ_FREQUENCY;
                     }
 
@@ -498,6 +504,7 @@ static void impl_SetBandAndChannel(vtxDevice_t * vtxDevice, uint8_t band, uint8_
     vtxState.request.band = band;
     vtxState.request.channel = channel;
     vtxState.request.freq = newFreqMhz;
+    vtxState.request.freqReasserts = 0;
     vtxState.updateReqMask |= VTX_UPDATE_REQ_FREQUENCY;
 }
 

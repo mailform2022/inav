@@ -48,7 +48,7 @@ typedef struct {
 } vtx3G3DeviceReport_t;
 
 void vtx3G3_ReportTrampCapabilities(uint16_t freqMin, uint16_t freqMax, uint16_t powerMax);
-void vtx3G3_ReportSmartAudioDevice(void);
+void vtx3G3_ReportSmartAudioDevice(uint8_t version, uint16_t freq);
 const vtx3G3DeviceReport_t * vtx3G3_DeviceReport(void);
 uint8_t vtx3G3_DetectSource(void);
 
@@ -56,6 +56,8 @@ uint8_t vtx3G3_EffectiveGrid(void);
 bool vtx3G3_GridIsTx3339(void);
 const char * vtx3G3_GridName(void);
 bool vtx3G3_TrampPowerIsMilliwatt(void);
+bool vtx3G3_SmartAudioByFrequency(void);
+bool vtx3G3_SmartAudioPowerIsIndex(void);
 uint8_t vtx3G3_BandCount(void);
 uint8_t vtx3G3_ChannelCount(void);
 uint8_t vtx3G3_PowerCount(void);

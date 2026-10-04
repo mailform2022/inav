@@ -33,8 +33,10 @@
 #include "fc/rc_modes.h"
 #include "io/serial.h"
 #include "io/piniobox.h"
+#include "flight/servos.h"
 
 #define MOLNIYA_USER4_AUX_INDEX 5   // AUX6 == CH10
+#define DUCK_S7_SERVO_INDEX 5       // pad S7 (PB10): 5th servo output after the two motors
 
 void targetConfiguration(void)
 {
@@ -49,4 +51,11 @@ void targetConfiguration(void)
     modeActivationConditionsMutable(0)->auxChannelIndex = MOLNIYA_USER4_AUX_INDEX;
     modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(1700);
     modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(2100);
+
+    // S7 two-position servo (rule `smix 4 5 16 100 0 -1` in the airframe diff,
+    // after the four manufacturer rules): full travel between the end points.
+    servoParamsMutable(DUCK_S7_SERVO_INDEX)->min = 1000;
+    servoParamsMutable(DUCK_S7_SERVO_INDEX)->max = 2000;
+    servoParamsMutable(DUCK_S7_SERVO_INDEX)->middle = 1500;
+    servoParamsMutable(DUCK_S7_SERVO_INDEX)->rate = 100;
 }

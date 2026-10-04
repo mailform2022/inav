@@ -71,7 +71,6 @@ bool cliMode = false;
 #include "drivers/usb_msc.h"
 #include "drivers/vtx_common.h"
 #include "io/vtx.h"
-#include "io/vtx_trace.h"
 #include "io/vtx_control.h"
 #include "io/vtx_string.h"
 #include "io/vtx_smartaudio.h"
@@ -2356,59 +2355,6 @@ static void cliVtxGrid(char *cmdline)
 }
 #endif
 
-#ifdef USE_VTX_TRACE
-// Raw VTX serial trace. One line per frame:
-//   <ms> <TRAMP|SA> <TX|RX> [x<repeats>] <hex bytes>
-// Paste the whole output into a file next to the blackbox log.
-static void cliVtxTrace(char *cmdline)
-{
-    if (sl_strncasecmp(cmdline, "clear", 5) == 0) {
-        vtxTraceClear();
-        cliPrintLine("vtxtrace cleared");
-        return;
-    }
-    if (sl_strncasecmp(cmdline, "on", 2) == 0) {
-        vtxTraceSetEnabled(true);
-        cliPrintLine("vtxtrace on");
-        return;
-    }
-    if (sl_strncasecmp(cmdline, "off", 3) == 0) {
-        vtxTraceSetEnabled(false);
-        cliPrintLine("vtxtrace off");
-        return;
-    }
-
-    static const char * const protoNames[] = { "TRAMP", "SA" };
-
-    vtxTraceUpdate(millis());
-    const vtxTraceStats_t *st = vtxTraceStats();
-    vtxDevice_t *vtxDevice = vtxCommonDevice();
-    cliPrintLinef("# vtxtrace %s records=%u dropped=%u tx=%u rx=%u vtx_dev=%d group=%d grid=%s now=%u",
-        st->enabled ? "on" : "off", st->records, st->dropped, st->txBytes, st->rxBytes,
-        vtxDevice ? vtxCommonGetDeviceType(vtxDevice) : 0, vtxSettingsConfig()->frequencyGroup,
-#if defined(USE_VTX_CONTROL)
-        vtx3G3_GridName(),
-#else
-        "-",
-#endif
-        millis());
-
-    vtxTraceRecord_t rec;
-    for (uint32_t i = 0; vtxTraceGet(i, &rec); i++) {
-        cliPrintf("%u %s %s", rec.timeMs,
-            rec.proto < ARRAYLEN(protoNames) ? protoNames[rec.proto] : "?",
-            rec.dir == VTX_TRACE_DIR_TX ? "TX" : "RX");
-        if (rec.repeats) {
-            cliPrintf(" x%u", rec.repeats + 1);
-        }
-        for (uint8_t b = 0; b < rec.len; b++) {
-            cliPrintf(" %02X", rec.data[b]);
-        }
-        cliPrintLinefeed();
-    }
-    cliPrintLine("# end vtxtrace");
-}
-#endif
 
 static void printGvar(uint8_t dumpMask, const globalVariableConfig_t *gvars, const globalVariableConfig_t *defaultGvars)
 {
@@ -4862,9 +4808,6 @@ const clicmd_t cmdTable[] = {
         "band <1-8> <MHz per channel, up to 20>\r\n"
         "\tpower <1-8> <mW> [tramp code, 0 = mW] [dBm]\r\n"
         "\treset\r\n", cliVtxGrid),
-#endif
-#ifdef USE_VTX_TRACE
-    CLI_COMMAND_DEF("vtxtrace", "dump raw VTX serial exchange", "[clear|on|off]", cliVtxTrace),
 #endif
 #ifdef USE_PROGRAMMING_FRAMEWORK
     CLI_COMMAND_DEF("logic", "configure logic conditions",

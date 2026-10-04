@@ -96,7 +96,6 @@
 #include "io/vtx.h"
 #include "io/vtx_control.h"
 #include "io/vtx_string.h"
-#include "io/vtx_trace.h"
 #include "io/gps_private.h"  //for MSP_SIMULATOR
 
 #include "io/osd/custom_elements.h"
@@ -3865,85 +3864,6 @@ bool mspFCProcessInOutCommand(uint16_t cmdMSP, sbuf_t *dst, sbuf_t *src, mspResu
         break;
 #endif
 
-#if defined(USE_VTX_TRACE)
-    case MSP2_INAV_VTX_TRACE:
-        {
-            // Raw VTX serial exchange, readable at any time (armed or not).
-            // Record numbers are absolute (counted since the last clear), so a
-            // reader can page while the ring keeps evicting: retained records are
-            // numbered dropped .. dropped+records-1.
-            // Request: [u32 firstRecord] [u8 maxRecords]  (both optional, default 0 / as many as fit)
-            // Reply:   u32 records, u32 dropped, u32 txBytes, u32 rxBytes, u8 enabled, u8 vtxDeviceType,
-            //          u32 firstRecord, u8 count, then count x { u32 timeMs, u16 repeats, u8 proto, u8 dir, u8 len, u8 data[len] }
-            uint32_t first = 0;
-            uint8_t maxRecords = 255;
-            if (dataSize >= 4) {
-                first = sbufReadU32(src);
-            }
-            if (dataSize >= 5) {
-                maxRecords = sbufReadU8(src);
-            }
-
-            vtxTraceUpdate(millis());
-            const vtxTraceStats_t *stats = vtxTraceStats();
-            if (first < stats->dropped) {
-                first = stats->dropped;
-            }
-            const uint32_t rel = first - stats->dropped;
-            vtxDevice_t *vtxDevice = vtxCommonDevice();
-            sbufWriteU32(dst, stats->records);
-            sbufWriteU32(dst, stats->dropped);
-            sbufWriteU32(dst, stats->txBytes);
-            sbufWriteU32(dst, stats->rxBytes);
-            sbufWriteU8(dst, stats->enabled ? 1 : 0);
-            sbufWriteU8(dst, vtxDevice ? vtxCommonGetDeviceType(vtxDevice) : 0);
-            sbufWriteU32(dst, first);
-
-            uint8_t *countPtr = sbufPtr(dst);
-            sbufWriteU8(dst, 0);
-
-            uint8_t count = 0;
-            vtxTraceRecord_t rec;
-            while (count < maxRecords && vtxTraceGet(rel + count, &rec)) {
-                if (sbufBytesRemaining(dst) < (int)(4 + 2 + 1 + 1 + 1 + rec.len)) {
-                    break;
-                }
-                sbufWriteU32(dst, rec.timeMs);
-                sbufWriteU16(dst, rec.repeats);
-                sbufWriteU8(dst, rec.proto);
-                sbufWriteU8(dst, rec.dir);
-                sbufWriteU8(dst, rec.len);
-                sbufWriteData(dst, rec.data, rec.len);
-                count++;
-            }
-            *countPtr = count;
-            *ret = MSP_RESULT_ACK;
-        }
-        break;
-
-    case MSP2_INAV_SET_VTX_TRACE:
-        // [u8 action]: 0 = disable, 1 = enable, 2 = clear
-        if (dataSize < 1) {
-            *ret = MSP_RESULT_ERROR;
-            break;
-        }
-        switch (sbufReadU8(src)) {
-            case 0:
-                vtxTraceSetEnabled(false);
-                break;
-            case 1:
-                vtxTraceSetEnabled(true);
-                break;
-            case 2:
-                vtxTraceClear();
-                break;
-            default:
-                *ret = MSP_RESULT_ERROR;
-                return true;
-        }
-        *ret = MSP_RESULT_ACK;
-        break;
-#endif
 
     case MSP2_COMMON_SETTING:
         *ret = mspSettingCommand(dst, src) ? MSP_RESULT_ACK : MSP_RESULT_ERROR;

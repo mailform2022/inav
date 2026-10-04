@@ -54,6 +54,11 @@
 #define VTX_STRING_3G3_FF37_BAND_COUNT 1
 #define VTX_STRING_3G3_FF37_CHAN_COUNT 20
 
+#define VTX_STRING_3G3_TX3704_BAND_COUNT  5
+#define VTX_STRING_3G3_TX3704_POWER_COUNT 5
+#define VTX_STRING_3G3_T4137W4_BAND_COUNT  3
+#define VTX_STRING_3G3_T4137W4_POWER_COUNT 5
+
 const uint16_t vtx58frequencyTable[VTX_STRING_5G8_BAND_COUNT][VTX_STRING_5G8_CHAN_COUNT] =
 {
     { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725 }, // A
@@ -240,9 +245,54 @@ static const char * const vtx3G3Ff37BandNames[VTX_STRING_3G3_FF37_BAND_COUNT + 1
     "A",
 };
 
+// TX3704: SmartAudio V2 unit, five rows of eight. Its GET_SETTINGS answer carries
+// the real frequency (unlike the FF3741's 0x4000 garbage) and it acknowledged
+// SET_FREQ but not SET_CHANNEL on the bench, so it is tuned by frequency.
+// Power is a plain V2 level index 0..4 (it reports index 4 at its 5 W top level).
+const uint16_t vtx3G3frequencyTableTx3704[VTX_STRING_3G3_TX3704_BAND_COUNT][VTX_STRING_3G3_CHAN_COUNT] =
+{
+    { 3200, 3220, 3240, 3260, 3280, 3300, 3320, 3340 }, // A
+    { 3360, 3380, 3400, 3420, 3440, 3460, 3480, 3500 }, // B
+    { 3520, 3540, 3560, 3580, 3600, 3620, 3640, 3680 }, // C
+    { 3210, 3250, 3290, 3330, 3370, 3410, 3450, 3490 }, // D
+    { 3230, 3290, 3350, 3410, 3470, 3530, 3590, 3700 }, // E
+};
+
+const char * const vtx3G3Tx3704PowerNames[VTX_STRING_3G3_TX3704_POWER_COUNT + 1] = {
+    "---", "25 ", "100", "200", "1W ", "5W "
+};
+
+static const uint16_t vtx3G3Tx3704PowerLevels[VTX_STRING_3G3_TX3704_POWER_COUNT] = { 25, 100, 200, 1000, 5000 };
+static const uint8_t vtx3G3Tx3704PowerDbm[VTX_STRING_3G3_TX3704_POWER_COUNT] = { 14, 20, 23, 30, 37 };
+
+// T4137W4: IRC Tramp unit answering 3700-4080 MHz / 4000 mW capabilities and
+// reporting its configured power in real mW. Its panel lists level 0 as a slow
+// (180 s) power ramp-up, which is sent as a 0 mW command; the ramp level must
+// not be compared against the read-back, which reports the target power.
+// Band C has only four channels, the rest of the row stays 0 (never sent).
+const uint16_t vtx3G3frequencyTableT4137w4[VTX_STRING_3G3_T4137W4_BAND_COUNT][VTX_STRING_3G3_CHAN_COUNT] =
+{
+    { 3700, 3720, 3740, 3760, 3780, 3800, 3820, 3840 }, // A
+    { 3860, 3880, 3900, 3920, 3940, 3960, 3980, 4000 }, // B
+    { 4020, 4040, 4060, 4080,    0,    0,    0,    0 }, // C
+};
+
+const char * const vtx3G3T4137w4PowerNames[VTX_STRING_3G3_T4137W4_POWER_COUNT + 1] = {
+    "---", "RMP", "500", "1W ", "2W ", "4W "
+};
+
+static const uint16_t vtx3G3T4137w4PowerLevels[VTX_STRING_3G3_T4137W4_POWER_COUNT] = { 0, 500, 1000, 2000, 4000 };
+static const uint8_t vtx3G3T4137w4PowerDbm[VTX_STRING_3G3_T4137W4_POWER_COUNT] = { 0, 27, 30, 33, 36 };
+
+static const char * const vtx3G3T4137w4BandNames[VTX_STRING_3G3_T4137W4_BAND_COUNT + 1] = {
+    "-", "A", "B", "C",
+};
+
 typedef struct vtx3G3GridInfo_s {
     const char *        name;
     bool                trampMilliwatt;  // device takes real mW, not SX33 scale codes
+    bool                saByFrequency;   // SmartAudio: always tune with SET_FREQ (device ignores SET_CHANNEL)
+    bool                saPowerIndex;    // SmartAudio: power is the plain V2 level index, never dBm
     const uint16_t *    freq;         // bandCount rows of chanCount entries
     const char * const *bandNames;    // [bandCount + 1], index 0 is "-"
     const char * const *chanNames;    // [chanCount + 1], index 0 is "-"
@@ -294,6 +344,26 @@ static const vtx3G3GridInfo_t vtx3G3Grids[] = {
         .powerCount = VTX_STRING_3G3_POWER_COUNT,
         .freqMin = 3700, .freqMax = 4080,
     },
+    [VTX_3G3_GRID_TX3704] = {
+        .name = "TX3704", .saByFrequency = true, .saPowerIndex = true,
+        .freq = &vtx3G3frequencyTableTx3704[0][0],
+        .bandNames = vtx3G3BandNames, .chanNames = vtx3G3ChannelNames,
+        .powerNames = vtx3G3Tx3704PowerNames,
+        .powerLevels = vtx3G3Tx3704PowerLevels, .powerDbm = vtx3G3Tx3704PowerDbm,
+        .bandCount = VTX_STRING_3G3_TX3704_BAND_COUNT, .chanCount = VTX_STRING_3G3_CHAN_COUNT,
+        .powerCount = VTX_STRING_3G3_TX3704_POWER_COUNT,
+        .freqMin = 3200, .freqMax = 3700,
+    },
+    [VTX_3G3_GRID_T4137W4] = {
+        .name = "T4137W4", .trampMilliwatt = true,
+        .freq = &vtx3G3frequencyTableT4137w4[0][0],
+        .bandNames = vtx3G3T4137w4BandNames, .chanNames = vtx3G3ChannelNames,
+        .powerNames = vtx3G3T4137w4PowerNames,
+        .powerLevels = vtx3G3T4137w4PowerLevels, .powerDbm = vtx3G3T4137w4PowerDbm,
+        .bandCount = VTX_STRING_3G3_T4137W4_BAND_COUNT, .chanCount = VTX_STRING_3G3_CHAN_COUNT,
+        .powerCount = VTX_STRING_3G3_T4137W4_POWER_COUNT,
+        .freqMin = 3700, .freqMax = 4080,
+    },
 };
 
 /* What the attached VTX said about itself, kept raw so a wrong guess can be traced
@@ -334,7 +404,12 @@ void vtx3G3_ReportTrampCapabilities(uint16_t freqMin, uint16_t freqMax, uint16_t
 
     const bool sane = (freqMin != 0) && (freqMin < freqMax);
 
-    if (sane && freqMin <= 3100 && freqMax >= 3450 && freqMax <= 3600) {
+    if (sane && freqMin >= 3650 && freqMin <= 3750 && freqMax >= 4000 && freqMax <= 4200) {
+        // Measured T4137W4 answer: 3700-4080 MHz / 4000 mW. No other unit here
+        // claims a lower limit above the SX33 grid's top.
+        vtx3G3Report.grid = VTX_3G3_GRID_T4137W4;
+        vtx3G3Report.detect = VTX_3G3_DETECT_RANGE;
+    } else if (sane && freqMin <= 3100 && freqMax >= 3450 && freqMax <= 3600) {
         vtx3G3Report.grid = VTX_3G3_GRID_TX3339;
         vtx3G3Report.detect = VTX_3G3_DETECT_RANGE;
     } else if (sane && freqMin >= 3150 && freqMin <= 3250 && freqMax >= 3650) {
@@ -359,14 +434,27 @@ void vtx3G3_ReportTrampCapabilities(uint16_t freqMin, uint16_t freqMax, uint16_t
  * and the two answer identically, so the protocol only rules out the IRC Tramp
  * devices. SX33 is reported because it is the long-standing default; an FF3.7
  * has to be selected by hand. */
-void vtx3G3_ReportSmartAudioDevice(void)
+void vtx3G3_ReportSmartAudioDevice(uint8_t version, uint16_t freq)
 {
     if (!vtx3G3_GroupSelected()) {
         return;
     }
 
-    vtx3G3Report.grid = VTX_3G3_GRID_SX33;
-    vtx3G3Report.detect = VTX_3G3_DETECT_PROTOCOL;
+    vtx3G3Report.freqMin = freq;
+    vtx3G3Report.freqMax = freq;
+    vtx3G3Report.powerMax = version;
+
+    // The TX3704 is the only SmartAudio unit here that speaks plain V2 and
+    // reports a real frequency (the FF3741 answers V2.1 with 0x4000 in the
+    // frequency field). A V2 device sitting inside the 3.3GHz grid is therefore
+    // taken for a TX3704; everything else keeps the long-standing SX33 default.
+    if (version == 2 && freq >= 3200 && freq <= 3700) {
+        vtx3G3Report.grid = VTX_3G3_GRID_TX3704;
+        vtx3G3Report.detect = VTX_3G3_DETECT_RANGE;
+    } else {
+        vtx3G3Report.grid = VTX_3G3_GRID_SX33;
+        vtx3G3Report.detect = VTX_3G3_DETECT_PROTOCOL;
+    }
 }
 
 const vtx3G3DeviceReport_t * vtx3G3_DeviceReport(void)
@@ -544,6 +632,16 @@ const char * vtx3G3_GridName(void)
 bool vtx3G3_TrampPowerIsMilliwatt(void)
 {
     return vtx3G3_Grid()->trampMilliwatt;
+}
+
+bool vtx3G3_SmartAudioByFrequency(void)
+{
+    return vtx3G3_Grid()->saByFrequency;
+}
+
+bool vtx3G3_SmartAudioPowerIsIndex(void)
+{
+    return vtx3G3_Grid()->saPowerIndex;
 }
 
 uint8_t vtx3G3_BandCount(void)

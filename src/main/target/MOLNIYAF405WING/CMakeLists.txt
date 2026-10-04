@@ -1,1 +1,1 @@
-target_stm32f405xg_intlog(MOLNIYAF405WING)
+target_stm32f405xg(MOLNIYAF405WING)

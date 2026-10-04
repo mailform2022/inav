@@ -532,16 +532,6 @@ Selection of where to write blackbox data
 
 ---
 
-### blackbox_flash_min_free
-
-Kilobytes of flash log space that must be free when arming. If less is free the whole flash log is erased right before arming (while still disarmed; the MCU pauses for a few seconds on internal flash). Older logs are kept as long as this much room remains. 0 = never erase automatically.
-
-| Default | Min | Max |
-| --- | --- | --- |
-| 0 | 0 | 65535 |
-
----
-
 ### blackbox_rate_denom
 
 Blackbox logging rate denominator. See blackbox_rate_num.
@@ -559,26 +549,6 @@ Blackbox logging rate numerator. Use num/denom settings to decide if a frame sho
 | Default | Min | Max |
 | --- | --- | --- |
 | 1 | 1 | 65535 |
-
----
-
-### blackbox_slow_after
-
-Seconds after the start of every log during which the configured blackbox rate is used. After that only every blackbox_slow_rate_denom-th loop is logged, so the launch is detailed and the rest of the flight still fits a small flash. 0 = keep the configured rate for the whole log.
-
-| Default | Min | Max |
-| --- | --- | --- |
-| 0 | 0 | 3600 |
-
----
-
-### blackbox_slow_rate_denom
-
-Blackbox rate denominator used once blackbox_slow_after has elapsed (numerator stays blackbox_rate_num). Never lower than blackbox_rate_denom.
-
-| Default | Min | Max |
-| --- | --- | --- |
-| 128 | 1 | 65535 |
 
 ---
 
@@ -6194,7 +6164,7 @@ On the 3.3GHz (FF3741) grid, clear pit mode and force channel mode when applying
 
 ### vtx_3g3_grid
 
-Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. AUTO (default): identify the VTX from what it reports - an IRC Tramp device is classified by the frequency range and max power it answers with (only the TX3339 and NONAME1 answer distinctively), a SmartAudio device is reported as SX33, and anything unrecognised falls back to SX33. SX33: 5 bands A-E over 3200-3700MHz, 25mW/2W/5W (also the FF3741). TX3339: BeastFPV TX3339-32CH, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. NONAME1: 3W IRC Tramp unit, 2 bands over 3200-3500MHz, 25mW/400mW/1W/3W. FF37: FF3.7 SmartAudio unit, one band of 20 channels over 3700-4080MHz, 25mW/2W/5W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range; the FF3741 and FF3.7 answer SmartAudio identically and cannot be told apart automatically. CUSTOM: the table entered with the CLI `vtxgrid` command (any band from 1.2 to 7.2 GHz, up to 8 bands x 20 channels, up to 8 power levels). 'status' shows the grid in use and how it was chosen.
+Which 3.3GHz VTX grid is attached, when vtx_frequency_groups is 3G3. AUTO (default): identify the VTX from what it reports - an IRC Tramp device is classified by the frequency range and max power it answers with (only the TX3339 and NONAME1 answer distinctively), a SmartAudio device is reported as TX3704 when it answers SmartAudio V2 with a frequency inside 3200-3700MHz, otherwise as SX33, and anything unrecognised falls back to SX33. SX33: 5 bands A-E over 3200-3700MHz, 25mW/2W/5W (also the FF3741). TX3339: BeastFPV TX3339-32CH, 4 bands A-D (FR1-FR4) over 3060-3480MHz, 25mW/3W/10W. NONAME1: 3W IRC Tramp unit, 2 bands over 3200-3500MHz, 25mW/400mW/1W/3W. FF37: FF3.7 SmartAudio unit, one band of 20 channels over 3700-4080MHz, 25mW/2W/5W. IRC Tramp commands an absolute frequency in MHz, so the wrong grid tunes the VTX to the wrong frequency and silently drops any channel outside the other grid's range; the FF3741 and FF3.7 answer SmartAudio identically and cannot be told apart automatically. CUSTOM: the table entered with the CLI `vtxgrid` command (any band from 1.2 to 7.2 GHz, up to 8 bands x 20 channels, up to 8 power levels). TX3704: SmartAudio V2 unit, 5 bands A-E of 8 channels over 3200-3700MHz, 25mW/100mW/200mW/1W/5W; tuned by frequency, power sent as the V2 level index. T4137W4: IRC Tramp unit reporting 3700-4080MHz / 4000mW, 3 bands (A 3700-3840, B 3860-4000, C 4020-4080), power in real mW: RAMP (device code 0, slow 180s ramp-up), 500mW, 1W, 2W, 4W. 'status' shows the grid in use and how it was chosen.
 
 | Default | Min | Max |
 | --- | --- | --- |

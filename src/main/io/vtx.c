@@ -45,7 +45,6 @@
 #include "io/serial.h"
 #include "io/vtx.h"
 #include "io/vtx_string.h"
-#include "io/vtx_trace.h"
 #include "io/vtx_control.h"
 #include "io/vtx_smartaudio.h"
 #include "io/vtx_tramp.h"
@@ -71,9 +70,6 @@ typedef enum {
 
 void vtxInit(void)
 {
-#ifdef USE_VTX_TRACE
-    vtxTraceInit();
-#endif
 }
 
 static vtxSettingsConfig_t * vtxGetRuntimeSettings(void)
@@ -165,11 +161,16 @@ static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice)
 
     // The device reports the pair we asked for - which on these clones is only
     // an echo of the request - so repeat the command to survive a lost frame.
-    // A device that does report the frequency it is tuned to (TX3339) confirms
+    // A device that does report the frequency it is tuned to (TX3339, TX3704) confirms
     // the change itself, so the repeats - and the extra video blanks they cause
     // - are dropped as soon as the read-back matches.
 #if defined(USE_VTX_TRAMP)
     if (reassertsLeft && vtxCommonGetDeviceType(vtxDevice) == VTXDEV_TRAMP && vtxTrampFrequencyConfirmed()) {
+        reassertsLeft = 0;
+    }
+#endif
+#if defined(USE_VTX_SMARTAUDIO)
+    if (reassertsLeft && vtxCommonGetDeviceType(vtxDevice) == VTXDEV_SMARTAUDIO && vtxSAFrequencyConfirmed()) {
         reassertsLeft = 0;
     }
 #endif
@@ -187,13 +188,21 @@ static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice)
 static bool vtxProcessPower(vtxDevice_t *vtxDevice, const vtxSettingsConfig_t * runtimeSettings)
 {
     uint8_t vtxPower;
+    uint8_t wantedPower = runtimeSettings->power;
+    vtxDeviceCapability_t capability;
 
     if (!vtxCommonGetPowerIndex(vtxDevice, &vtxPower)) {
         return false;
     }
 
-    if (vtxPower != runtimeSettings->power) {
-        vtxCommonSetPowerByIndex(vtxDevice, runtimeSettings->power);
+    // vtx_power is shared by grids with 3 to 5 levels; past the top of the
+    // attached grid it means that grid's highest level
+    if (vtxCommonGetDeviceCapability(vtxDevice, &capability) && capability.powerCount > 0 && wantedPower > capability.powerCount) {
+        wantedPower = capability.powerCount;
+    }
+
+    if (vtxPower != wantedPower) {
+        vtxCommonSetPowerByIndex(vtxDevice, wantedPower);
         return true;
     }
 
@@ -291,9 +300,6 @@ void vtxUpdate(timeUs_t currentTimeUs)
         return;
     }
 
-#ifdef USE_VTX_TRACE
-    vtxTraceUpdate(currentTimeUs / 1000);
-#endif
 
 #if defined(USE_VTX_SMARTAUDIO) && defined(USE_VTX_TRAMP)
     vtxAutoDetectUpdate();

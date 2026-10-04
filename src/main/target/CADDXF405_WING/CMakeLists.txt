@@ -1,1 +1,1 @@
-target_stm32f405xg_intlog(CADDXF405_WING)
+target_stm32f405xg(CADDXF405_WING)

@@ -32,9 +32,9 @@ timerHardware_t timerHardware[] = {
 
     // Pads below are numbered per the measured silkscreen, not the schematic.
     // PA15 (S9) is the PINIO2 arming high-level output, so it is not a PWM pad.
-    // PB10 (S7) is deliberately left out: S7 must stay inert on this airframe.
     // PB14 (S11) is TIM8_CH2N, a complementary output sharing TIM8 with the S5
     // and S6 servos, so it is left out to keep those two channels clean.
+    DEF_TIM(TIM2,   CH3, PB10, TIM_USE_OUTPUT_AUTO,   1, 0), // S7 (two-position servo, CH10)
     DEF_TIM(TIM2,   CH4, PB11, TIM_USE_OUTPUT_AUTO,   1, 0), // S8
     DEF_TIM(TIM12,  CH2, PB15, TIM_USE_OUTPUT_AUTO,   1, 0), // S12
 

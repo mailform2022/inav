@@ -160,10 +160,7 @@
 #define SDCARD_SPI_BUS          BUS_SPI3
 #define SDCARD_CS_PIN           PC14
 
-// Blackbox in the MCU's own flash (sectors 9-10) for boards without SD/dataflash
-#define USE_FLASHFS
-#define USE_FLASH_INTERNAL
-#define ENABLE_BLACKBOX_LOGGING_ON_SPIFLASH_BY_DEFAULT
+#define ENABLE_BLACKBOX_LOGGING_ON_SDCARD_BY_DEFAULT
 
 #define DEFAULT_RX_TYPE         RX_TYPE_SERIAL
 #define SERIALRX_PROVIDER       SERIALRX_CRSF

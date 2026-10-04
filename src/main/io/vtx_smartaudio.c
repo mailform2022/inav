@@ -50,7 +50,6 @@
 #include "io/vtx_control.h"
 #include "io/vtx_smartaudio.h"
 #include "io/vtx_string.h"
-#include "io/vtx_trace.h"
 
 
 // Timing parameters
@@ -58,6 +57,7 @@
 #define SMARTAUDIO_CMD_TIMEOUT       120    // Time until the command is considered lost
 #define SMARTAUDIO_POLLING_INTERVAL  150    // Minimum time between state polling
 #define SMARTAUDIO_POLLING_WINDOW   1000    // Time window after command polling for state change
+#define SMARTAUDIO_3G3_MAX_RESENDS     4    // 3.3GHz: give up on an unanswered command after this many retries
 #define SA_3G3_POLL_INTERVAL_MS     1000    // Read-only liveness poll of the 3.3 GHz VTX (does not retune RF)
 #define SA_3G3_LINK_TIMEOUT_MS      2500    // No reply for this long => link lost; re-apply once on reconnect
 
@@ -308,6 +308,7 @@ static timeUs_t sa_lastTransmissionMs = 0;
 static uint8_t sa_outstanding = SA_CMD_NONE; // Outstanding command
 static uint8_t sa_osbuf[32]; // Outstanding comamnd frame for retransmission
 static int sa_oslen;         // And associate length
+static uint8_t sa_resends = 0; // Retransmissions of the outstanding command so far
 
 // The 3.3GHz grids differ in shape (5x8, 4x8, 2x8, 1x20) and in how many power
 // levels they expose, so what the device advertises is replaced by the grid.
@@ -331,8 +332,10 @@ static void saProcessResponse(uint8_t *buf, int len)
 
     if (resp == sa_outstanding) {
         sa_outstanding = SA_CMD_NONE;
+        sa_resends = 0;
     } else if ((resp == SA_CMD_GET_SETTINGS_V2 || resp == SA_CMD_GET_SETTINGS_V21) && (sa_outstanding == SA_CMD_GET_SETTINGS)) {
         sa_outstanding = SA_CMD_NONE;
+        sa_resends = 0;
     } else {
         saStat.ooopresp++;
         LOG_DEBUG(VTX, "processResponse: outstanding %d got %d", sa_outstanding, resp);
@@ -350,15 +353,16 @@ static void saProcessResponse(uint8_t *buf, int len)
         // saDevice.version = 0 means unknown, 1 means Smart audio V1, 2 means Smart audio V2 and 3 means Smart audio V2.1
         saDevice.version = (buf[0] == SA_CMD_GET_SETTINGS) ? 1 : ((buf[0] == SA_CMD_GET_SETTINGS_V2) ? 2 : 3);
 
-        // A 3.3GHz VTX answering SmartAudio is an FF3741 or an FF3.7; the IRC
-        // Tramp devices are ruled out, but the two SmartAudio ones answer alike.
-        vtx3G3_ReportSmartAudioDevice();
-        sa3G3UpdateCapabilities();
-
         saDevice.channel = buf[2];
         uint8_t rawPowerValue = buf[3];
         saDevice.mode = buf[4];
         saDevice.freq = (buf[5] << 8) | buf[6];
+
+        // A 3.3GHz VTX answering SmartAudio rules out the IRC Tramp devices; the
+        // classifier then tells the V2 TX3704 (reports a real frequency) from
+        // the FF3741/FF3.7 (V2.1, garbage frequency), which answer alike.
+        vtx3G3_ReportSmartAudioDevice(saDevice.version, saDevice.freq & 0x3FFF);
+        sa3G3UpdateCapabilities();
 
         // read pir and por flags to detect if the device will boot into pitmode.
         // note that "quit pitmode without unsetting the pitmode flag" clears pir and por flags but the device will still boot into pitmode.
@@ -565,9 +569,6 @@ static void saSendFrame(uint8_t *buf, int len)
     for (int i = 0 ; i < len ; i++) {
         serialWrite(smartAudioSerialPort, buf[i]);
     }
-#ifdef USE_VTX_TRACE
-    vtxTraceTx(VTX_TRACE_PROTO_SMARTAUDIO, buf, len);
-#endif
 
     // XXX: Workaround for early AKK SAudio-enabled VTX bug,
     // shouldn't cause any problems with VTX with properly
@@ -813,9 +814,6 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
 
     while (serialRxBytesWaiting(smartAudioSerialPort) > 0) {
         uint8_t c = serialRead(smartAudioSerialPort);
-#ifdef USE_VTX_TRACE
-        vtxTraceRxByte(VTX_TRACE_PROTO_SMARTAUDIO, c);
-#endif
         saReceiveFramer((uint16_t)c);
     }
 
@@ -863,11 +861,18 @@ static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
     static timeMs_t lastCommandSentMs = 0; // Last non-GET_SETTINGS sent
 
     if ((sa_outstanding != SA_CMD_NONE) && (nowMs - sa_lastTransmissionMs > SMARTAUDIO_CMD_TIMEOUT)) {
-        // Last command timed out
-        // LOG_DEBUG(VTX, "process: resending 0x%x", sa_outstanding);
-        // XXX Todo: Resend termination and possible offline transition
-        saResendCmd();
-    lastCommandSentMs = nowMs;
+        // Last command timed out. Some 3.3GHz units (TX3704) acknowledge a
+        // SET_FREQ only after ~2 s, so an unbounded 120 ms retry loop would
+        // hammer the same frame a dozen times; on that group the command is
+        // dropped after a few retries and the settings poll shows the result.
+        if (vtxSettingsConfig()->frequencyGroup == FREQUENCYGROUP_3G3 && sa_resends >= SMARTAUDIO_3G3_MAX_RESENDS) {
+            sa_outstanding = SA_CMD_NONE;
+            sa_resends = 0;
+        } else {
+            sa_resends++;
+            saResendCmd();
+            lastCommandSentMs = nowMs;
+        }
     } else if (!saQueueEmpty()) {
         // Command pending. Send it.
         // LOG_DEBUG(VTX, "process: sending queue");
@@ -1012,9 +1017,6 @@ static void sa3G3SendChannel(uint8_t band, uint8_t channel)
         while (!isSerialTransmitBufferEmpty(smartAudioSerialPort)) { /* drain */ }
         delay(interByteMs);
     }
-#ifdef USE_VTX_TRACE
-    vtxTraceTx(VTX_TRACE_PROTO_SMARTAUDIO, buf, sizeof(buf));
-#endif
     sa_lastTransmissionMs = millis();
     saStat.pktsent++;
     sa3G3TxTotal++;
@@ -1056,7 +1058,8 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
             sa3G3ApplyForceTx();
         }
 
-        switch (vtxConfig()->vtx3g3ChannelMode) {
+        switch (vtx3G3_SmartAudioByFrequency() && vtxConfig()->vtx3g3ChannelMode != VTX_3G3_CHAN_NONE
+                ? VTX_3G3_CHAN_FREQUENCY : vtxConfig()->vtx3g3ChannelMode) {
         case VTX_3G3_CHAN_NONE:
             // Do not command the channel; leave what the buttons selected.
             return;
@@ -1105,7 +1108,7 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
         // Sent once per change (the getter reports the commanded index back, so
         // the scheduler does not re-send every cycle), which keeps the video
         // stable.
-        if (index < 1 || index > 3) {
+        if (index < 1 || index > vtx3G3_PowerCount()) {
             return;
         }
 
@@ -1125,7 +1128,10 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
             sa3G3ApplyForceTx();
         }
 
-        switch (vtxConfig()->vtx3g3PowerMode) {
+        // Grids that take a plain V2 level index (TX3704: 0..4 for its five
+        // levels) ignore the dBm modes - a dBm byte with the MSB set would be
+        // read as a bogus index.
+        switch (vtx3G3_SmartAudioPowerIsIndex() ? VTX_3G3_POWER_INDEX : vtxConfig()->vtx3g3PowerMode) {
         case VTX_3G3_POWER_INDEX:
             buf[4] = index - 1;                       // V2.0: power by level index
             break;
@@ -1141,13 +1147,15 @@ void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channe
             // device's reported levels (min / middle / max).
             uint8_t dbi = vtx3G3_PowerDbm(index);     // fallback to grid dBm
             if (saPowerCount > 0) {
+                const uint8_t gridCount = vtx3G3_PowerCount();
                 uint8_t devIdx;
                 if (index == 1) {
                     devIdx = 0;                        // lowest
-                } else if (index >= 3) {
+                } else if (index >= gridCount) {
                     devIdx = saPowerCount - 1;         // highest
                 } else {
-                    devIdx = (saPowerCount - 1) / 2;   // middle
+                    // proportional position between the extremes
+                    devIdx = ((index - 1) * (saPowerCount - 1) + (gridCount - 1) / 2) / (gridCount - 1);
                 }
                 dbi = saPowerTable[devIdx].dbi;
             }
@@ -1264,6 +1272,22 @@ static bool vtxSAGetBandAndChannel(const vtxDevice_t *vtxDevice, uint8_t *pBand,
     *pChannel = SA_DEVICE_CHVAL_TO_CHANNEL(saDevice.channel) + 1;
 
     return true;
+}
+
+// True once a 3.3GHz unit in frequency mode (TX3704) reports back the grid
+// frequency of the pair last commanded and nothing is left to send. Clones
+// that report zero or garbage (SX33, FF3741) never confirm, so they keep the
+// blind repeats.
+bool vtxSAFrequencyConfirmed(void)
+{
+    if (vtxSettingsConfig()->frequencyGroup != FREQUENCYGROUP_3G3 ||
+        sa_outstanding != SA_CMD_NONE || !saQueueEmpty() ||
+        !(saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ)) {
+        return false;
+    }
+
+    const uint16_t freq = vtx3G3_Bandchan2Freq(sa3G3Band, sa3G3Channel);
+    return freq != 0 && (saDevice.freq & SA_FREQ_MASK) == freq;
 }
 
 static bool vtxSAGetPowerIndex(const vtxDevice_t *vtxDevice, uint8_t *pIndex)
