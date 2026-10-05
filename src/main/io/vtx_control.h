@@ -109,6 +109,40 @@ typedef struct vtxRcMapEntry_s {
 PG_DECLARE_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries);
 
 /*
+ * Privacy curtain carried on the same RC channel as the VTX map pairs, for
+ * receivers without a spare channel for it. The transmitter adds an offset to
+ * the value of the selected pair while the curtain is wanted:
+ *   FIXED: curtain ON = pair value + vtx_curtain_offset
+ *   FLOAT: curtain ON = any value above the highest pair; the pair is the one
+ *          at value - (span of all pairs on that channel)
+ * With no pairs on the curtain channel (VTX without band/channel control) the
+ * transmitter sends VTX_CURTAIN_RC_BASE for OFF and BASE + offset for ON.
+ * The USER3 mode keeps working in every mode, so the separate-channel setup
+ * stays available.
+ */
+#define VTX_CURTAIN_RC_BASE           1000
+#define VTX_CURTAIN_RC_DEFAULT_OFFSET 500
+
+typedef enum {
+    VTX_CURTAIN_RC_OFF = 0,
+    VTX_CURTAIN_RC_FIXED,
+    VTX_CURTAIN_RC_FLOAT,
+} vtxCurtainRcMode_e;
+
+typedef struct vtxCurtainConfig_s {
+    uint8_t  mode;         // vtxCurtainRcMode_e
+    uint8_t  rcChannel;    // 1..16, 0 = the channel of the first VTX map entry
+    uint16_t offset;       // us, FIXED mode
+} vtxCurtainConfig_t;
+
+PG_DECLARE(vtxCurtainConfig_t, vtxCurtainConfig);
+
+uint8_t vtxCurtainRcChannel(void);
+uint16_t vtxCurtainRcOffset(uint8_t rcChannel);
+bool vtxRcCurtainActive(void);
+int8_t vtxRcMapFindEntry(void);
+
+/*
  * User-defined band/channel/power table, selected with vtx_3g3_grid = CUSTOM.
  * Decouples the frequency table from the protocol driver so a VTX in any band
  * (1.2-1.5, 3.3-3.7, 4.9-5.8, 6.1-7.2 GHz) can be described from the CLI

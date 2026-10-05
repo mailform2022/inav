@@ -110,6 +110,7 @@
 #define MSP2_INAV_SET_VTX_RC_MAP                0x2091
 #define MSP2_INAV_VTX_CUSTOM_GRID               0x2092
 #define MSP2_INAV_SET_VTX_CUSTOM_GRID           0x2093
+#define MSP2_INAV_VTX_RC_MAP_STATUS             0x2094
 
 #define MSP2_INAV_VTX_TABLE_CUSTOM              0x2F00
 #define MSP2_INAV_SET_VTX_TABLE_CUSTOM          0x2F01

@@ -6252,6 +6252,36 @@ Channel to use within the configured `vtx_band`. Valid values are [1, 8] on ever
 
 ---
 
+### vtx_curtain_channel
+
+RC channel (1-16) carrying the combined curtain/VTX value. 0 (default): the channel of the first VTX map entry.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 16 |
+
+---
+
+### vtx_curtain_mode
+
+Privacy curtain on the VTX map channel, for receivers without a spare channel. OFF (default): the curtain follows only the USER3 mode and the VTX map works as before. FIXED: the transmitter adds `vtx_curtain_offset` to the value of the selected pair while the curtain is on, e.g. pair 1100 -> 1600. FLOAT: any value above the highest pair turns the curtain on and the pair is taken at value minus the span of all pairs on that channel. The setting applies to all pairs at once; the USER3 mode keeps working in every mode. With no pairs on the curtain channel (VTX without band/channel control) the transmitter sends 1000 for OFF and 1000 + offset for ON.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| OFF |  |  |
+
+---
+
+### vtx_curtain_offset
+
+Curtain offset in us added by the transmitter to the pair value in FIXED mode (also the ON value above 1000 when no pairs are mapped). Must be larger than the span of the pairs so shifted values do not land on another pair.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 500 | 10 | 1000 |
+
+---
+
 ### vtx_frequency_group
 
 VTx Frequency group to use. Frequency groups: FREQUENCYGROUP_5G8: 5.8GHz, FREQUENCYGROUP_2G4: 2.4GHz, FREQUENCYGROUP_1G3: 1.3GHz, FREQUENCYGROUP_3G3: 3.3GHz.

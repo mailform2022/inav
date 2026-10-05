@@ -173,9 +173,10 @@
 #define ADC_CHANNEL_3_PIN           PC5
 #define ADC_CHANNEL_4_PIN           PC4
 #define VBAT_ADC_CHANNEL            ADC_CHN_1
-#define CURRENT_METER_ADC_CHANNEL   ADC_CHN_2
-#define RSSI_ADC_CHANNEL            ADC_CHN_4
-#define AIRSPEED_ADC_CHANNEL        ADC_CHN_3
+// Duck boards: current sensor on PC5 and RSSI on PC1, as in the manufacturer firmware
+#define CURRENT_METER_ADC_CHANNEL   ADC_CHN_3
+#define RSSI_ADC_CHANNEL            ADC_CHN_2
+#define AIRSPEED_ADC_CHANNEL        ADC_CHN_4
 
 // *************** LED2812 ************************
 #define USE_LED_STRIP

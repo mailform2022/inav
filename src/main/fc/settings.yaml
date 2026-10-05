@@ -130,6 +130,9 @@ tables:
   - name: vtx_3g3_grids
     values: ["SX33", "TX3339", "AUTO", "NONAME1", "FF37", "CUSTOM", "TX3704", "T4137W4"]
     enum: vtx3g3Grid_e
+  - name: vtx_curtain_modes
+    values: ["OFF", "FIXED", "FLOAT"]
+    enum: vtxCurtainRcMode_e
   - name: filter_type
     values: ["PT1", "BIQUAD"]
   - name: filter_type_full
@@ -3913,6 +3916,32 @@ groups:
         default_value: ON
         field: vtx3g3ChanFreqFix
         type: bool
+
+  - name: PG_VTX_CURTAIN_CONFIG
+    type: vtxCurtainConfig_t
+    headers: ["io/vtx_control.h"]
+    condition: USE_VTX_CONTROL
+    members:
+      - name: vtx_curtain_mode
+        description: "Privacy curtain on the VTX map channel, for receivers without a spare channel. OFF (default): the curtain follows only the USER3 mode and the VTX map works as before. FIXED: the transmitter adds `vtx_curtain_offset` to the value of the selected pair while the curtain is on, e.g. pair 1100 -> 1600. FLOAT: any value above the highest pair turns the curtain on and the pair is taken at value minus the span of all pairs on that channel. The setting applies to all pairs at once; the USER3 mode keeps working in every mode. With no pairs on the curtain channel (VTX without band/channel control) the transmitter sends 1000 for OFF and 1000 + offset for ON."
+        default_value: "OFF"
+        field: mode
+        table: vtx_curtain_modes
+        type: uint8_t
+      - name: vtx_curtain_channel
+        description: "RC channel (1-16) carrying the combined curtain/VTX value. 0 (default): the channel of the first VTX map entry."
+        default_value: 0
+        field: rcChannel
+        min: 0
+        max: 16
+        type: uint8_t
+      - name: vtx_curtain_offset
+        description: "Curtain offset in us added by the transmitter to the pair value in FIXED mode (also the ON value above 1000 when no pairs are mapped). Must be larger than the span of the pairs so shifted values do not land on another pair."
+        default_value: 500
+        field: offset
+        min: 10
+        max: 1000
+        type: uint16_t
 
   - name: PG_VTX_SETTINGS_CONFIG
     type: vtxSettingsConfig_t

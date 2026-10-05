@@ -1707,6 +1707,18 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
         }
         break;
 
+    case MSP2_INAV_VTX_RC_MAP_STATUS:
+        {
+            // entry (0xFF = none), curtain, curtain channel, its value, curtain offset
+            const uint8_t curtainChannel = vtxCurtainRcChannel();
+            sbufWriteU8(dst, (uint8_t)vtxRcMapFindEntry());
+            sbufWriteU8(dst, vtxRcCurtainActive() ? 1 : 0);
+            sbufWriteU8(dst, curtainChannel);
+            sbufWriteU16(dst, curtainChannel ? rxGetChannelValue(curtainChannel - 1) : 0);
+            sbufWriteU16(dst, curtainChannel ? vtxCurtainRcOffset(curtainChannel) : 0);
+        }
+        break;
+
     case MSP2_INAV_VTX_CUSTOM_GRID:
         {
             // Layout: maxBands maxChans maxPower bandCount chanCount powerCount,

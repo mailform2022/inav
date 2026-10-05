@@ -73,6 +73,14 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
 PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 1);
 PG_REGISTER(vtxCustomGridConfig_t, vtxCustomGridConfig, PG_VTX_CUSTOM_GRID, 0);
 
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 0);
+
+PG_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig,
+      .mode = SETTING_VTX_CURTAIN_MODE_DEFAULT,
+      .rcChannel = SETTING_VTX_CURTAIN_CHANNEL_DEFAULT,
+      .offset = SETTING_VTX_CURTAIN_OFFSET_DEFAULT,
+);
+
 static uint8_t locked = 0;
 
 void vtxControlInit(void)
@@ -149,34 +157,154 @@ void vtxUpdateActivatedChannel(void)
     }
 }
 
+static bool vtxRcMapEntryIsValid(const vtxRcMapEntry_t *entry)
+{
+    return entry->rcChannel >= 1 && entry->rcChannel <= VTX_RC_MAP_CHANNEL_COUNT &&
+        entry->band >= VTX_SETTINGS_MIN_BAND && entry->channel >= VTX_SETTINGS_MIN_CHANNEL &&
+        entry->rangeEnd >= entry->rangeStart;
+}
+
+static int rcMapChannelValue(uint8_t rcChannel)
+{
+    return rxGetChannelValue(rcChannel - 1);
+}
+
+// Lowest start and highest end of the pairs on one RC channel
+static bool vtxRcMapChannelSpan(uint8_t rcChannel, uint16_t *low, uint16_t *high)
+{
+    bool found = false;
+
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (!vtxRcMapEntryIsValid(entry) || entry->rcChannel != rcChannel) {
+            continue;
+        }
+        if (!found || entry->rangeStart < *low) {
+            *low = entry->rangeStart;
+        }
+        if (!found || entry->rangeEnd > *high) {
+            *high = entry->rangeEnd;
+        }
+        found = true;
+    }
+
+    return found;
+}
+
+// rcChannel == 0 matches the pairs of every channel
+static int8_t vtxRcMapMatch(uint8_t rcChannel, int shift)
+{
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (!vtxRcMapEntryIsValid(entry) || (rcChannel && entry->rcChannel != rcChannel)) {
+            continue;
+        }
+
+        const int value = rcMapChannelValue(entry->rcChannel) - shift;
+        if (value >= entry->rangeStart && value <= entry->rangeEnd) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+uint8_t vtxCurtainRcChannel(void)
+{
+    if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_OFF) {
+        return 0;
+    }
+
+    if (vtxCurtainConfig()->rcChannel) {
+        return vtxCurtainConfig()->rcChannel;
+    }
+
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (vtxRcMapEntryIsValid(entry)) {
+            return entry->rcChannel;
+        }
+    }
+
+    return 0;
+}
+
+uint16_t vtxCurtainRcOffset(uint8_t rcChannel)
+{
+    uint16_t low = 0;
+    uint16_t high = 0;
+
+    if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
+        if (rcChannel && vtxRcMapChannelSpan(rcChannel, &low, &high)) {
+            return high - low + 1;
+        }
+        return VTX_CURTAIN_RC_DEFAULT_OFFSET;
+    }
+
+    return vtxCurtainConfig()->offset;
+}
+
+int8_t vtxRcMapFindEntry(void)
+{
+    int8_t index = vtxRcMapMatch(0, 0);
+    if (index >= 0) {
+        return index;
+    }
+
+    const uint8_t rcChannel = vtxCurtainRcChannel();
+    if (rcChannel) {
+        index = vtxRcMapMatch(rcChannel, vtxCurtainRcOffset(rcChannel));
+    }
+
+    return index;
+}
+
+bool vtxRcCurtainActive(void)
+{
+    // Between ranges (a switch in travel, an unmapped value) the curtain holds
+    static bool active = false;
+
+    const uint8_t rcChannel = vtxCurtainRcChannel();
+    if (!rcChannel) {
+        active = false;
+        return false;
+    }
+
+    const int value = rcMapChannelValue(rcChannel);
+    const uint16_t offset = vtxCurtainRcOffset(rcChannel);
+    uint16_t low = 0;
+    uint16_t high = 0;
+
+    if (!vtxRcMapChannelSpan(rcChannel, &low, &high)) {
+        active = value >= VTX_CURTAIN_RC_BASE + offset / 2;
+    } else if (vtxRcMapMatch(rcChannel, 0) >= 0) {
+        active = false;
+    } else if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
+        if (value > high) {
+            active = true;
+        }
+    } else if (vtxRcMapMatch(rcChannel, offset) >= 0) {
+        active = true;
+    }
+
+    return active;
+}
+
 void vtxUpdateRcMap(void)
 {
     static int8_t appliedEntry = -1;
 
-    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
-        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
-
-        if (entry->rcChannel < 1 || entry->rcChannel > VTX_RC_MAP_CHANNEL_COUNT ||
-            entry->band < VTX_SETTINGS_MIN_BAND || entry->channel < VTX_SETTINGS_MIN_CHANNEL ||
-            entry->rangeEnd < entry->rangeStart) {
-            continue;
-        }
-
-        const uint16_t value = rxGetChannelValue(entry->rcChannel - 1);
-        if (value < entry->rangeStart || value > entry->rangeEnd) {
-            continue;
-        }
-
-        if (index != appliedEntry) {
-            appliedEntry = index;
-            vtxSettingsConfigMutable()->band = constrain(entry->band, VTX_SETTINGS_MIN_BAND, VTX_SETTINGS_MAX_BAND_ANY);
-            vtxSettingsConfigMutable()->channel = constrain(entry->channel, VTX_SETTINGS_MIN_CHANNEL, VTX_SETTINGS_MAX_CHANNEL_ANY);
-            if (entry->power) {
-                vtxSettingsConfigMutable()->power = entry->power;
-            }
-        }
-
+    const int8_t index = vtxRcMapFindEntry();
+    if (index < 0 || index == appliedEntry) {
         return;
+    }
+
+    const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+    appliedEntry = index;
+    vtxSettingsConfigMutable()->band = constrain(entry->band, VTX_SETTINGS_MIN_BAND, VTX_SETTINGS_MAX_BAND_ANY);
+    vtxSettingsConfigMutable()->channel = constrain(entry->channel, VTX_SETTINGS_MIN_CHANNEL, VTX_SETTINGS_MAX_CHANNEL_ANY);
+    if (entry->power) {
+        vtxSettingsConfigMutable()->power = entry->power;
     }
 }
 

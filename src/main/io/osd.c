@@ -71,6 +71,7 @@
 #include "io/displayport_msp_bf_compat.h"
 #include "io/vtx.h"
 #include "io/vtx_string.h"
+#include "io/vtx_control.h"
 
 #include "io/osd/custom_elements.h"
 
@@ -5020,6 +5021,9 @@ static void osdRefresh(timeUs_t currentTimeUs)
     if (!displayIsGrabbed(osdDisplayPort)) {
         static bool curtainActive = false;
         bool curtainWanted = IS_RC_MODE_ACTIVE(BOXUSER3);
+#ifdef USE_VTX_CONTROL
+        curtainWanted = curtainWanted || vtxRcCurtainActive();
+#endif
         displayBeginTransaction(osdDisplayPort, DISPLAY_TRANSACTION_OPT_RESET_DRAWING);
         if (fullRedraw || (curtainWanted != curtainActive)) {
             displayClearScreen(osdDisplayPort);
