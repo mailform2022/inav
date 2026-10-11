@@ -128,7 +128,7 @@ tables:
     values: ["CHANNEL", "FREQUENCY", "NONE"]
     enum: vtx3g3ChannelMode_e
   - name: vtx_3g3_grids
-    values: ["SX33", "TX3339", "AUTO", "NONAME1", "FF37", "CUSTOM", "TX3704", "T4137W4"]
+    values: ["SX33", "TX3339", "AUTO", "NONAME1", "FF37", "CUSTOM", "TX3704", "T4137W4", "TX3748"]
     enum: vtx3g3Grid_e
   - name: vtx_curtain_modes
     values: ["OFF", "FIXED", "FLOAT"]

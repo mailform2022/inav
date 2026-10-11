@@ -99,7 +99,7 @@ static vtxSettingsConfig_t * vtxGetRuntimeSettings(void)
 // positions; it is paid on every change, so it is kept as short as that allows.
 // A pair held for longer than the window during a deliberately slow sweep is
 // tuned, but the sweep still ends on the selected pair.
-#define VTX_BANDCHAN_SETTLE_MS 250
+#define VTX_BANDCHAN_SETTLE_MS 150
 #define VTX_BANDCHAN_REASSERT_MS 250
 
 static uint8_t settledBand = 0;

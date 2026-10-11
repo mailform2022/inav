@@ -1281,8 +1281,16 @@ static bool vtxSAGetBandAndChannel(const vtxDevice_t *vtxDevice, uint8_t *pBand,
 bool vtxSAFrequencyConfirmed(void)
 {
     if (vtxSettingsConfig()->frequencyGroup != FREQUENCYGROUP_3G3 ||
-        sa_outstanding != SA_CMD_NONE || !saQueueEmpty() ||
-        !(saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ)) {
+        sa_outstanding != SA_CMD_NONE || !saQueueEmpty()) {
+        return false;
+    }
+
+    if (vtx3G3_SmartAudioChannelReadback() && !(saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ)) {
+        return sa3G3Band && sa3G3Channel &&
+            saDevice.channel == SA_BANDCHAN_TO_DEVICE_CHVAL(sa3G3Band - 1, sa3G3Channel - 1);
+    }
+
+    if (!(saDevice.mode & SA_MODE_GET_FREQ_BY_FREQ)) {
         return false;
     }
 

@@ -58,6 +58,7 @@
 #define VTX_STRING_3G3_TX3704_POWER_COUNT 5
 #define VTX_STRING_3G3_T4137W4_BAND_COUNT  3
 #define VTX_STRING_3G3_T4137W4_POWER_COUNT 5
+#define VTX_STRING_3G3_TX3748_BAND_COUNT  7
 
 const uint16_t vtx58frequencyTable[VTX_STRING_5G8_BAND_COUNT][VTX_STRING_5G8_CHAN_COUNT] =
 {
@@ -288,11 +289,33 @@ static const char * const vtx3G3T4137w4BandNames[VTX_STRING_3G3_T4137W4_BAND_COU
     "-", "A", "B", "C",
 };
 
+// TX3748: SmartAudio V2.1 unit in the TX3704 housing, seven rows of eight on a
+// 20 MHz raster from 3700 MHz. It takes SET_CHANNEL with the flat index
+// band * 8 + channel and reports that index back in GET_SETTINGS, while its
+// frequency field always reads 5865, so the channel read-back confirms a switch.
+const uint16_t vtx3G3frequencyTableTx3748[VTX_STRING_3G3_TX3748_BAND_COUNT][VTX_STRING_3G3_CHAN_COUNT] =
+{
+    { 3700, 3720, 3740, 3760, 3780, 3800, 3820, 3840 }, // A
+    { 3860, 3880, 3900, 3920, 3940, 3960, 3980, 4000 }, // B
+    { 4020, 4040, 4060, 4080, 4100, 4120, 4140, 4160 }, // C
+    { 4180, 4200, 4220, 4240, 4260, 4280, 4300, 4320 }, // D
+    { 4340, 4360, 4380, 4400, 4420, 4440, 4460, 4480 }, // E
+    { 4500, 4520, 4540, 4560, 4580, 4600, 4620, 4640 }, // F
+    { 4660, 4680, 4700, 4720, 4740, 4760, 4780, 4800 }, // G
+};
+
+static const char * const vtx3G3Tx3748BandNames[VTX_STRING_3G3_TX3748_BAND_COUNT + 1] = {
+    "-", "A", "B", "C", "D", "E", "F", "G",
+};
+
+#define VTX_3G3_TX3748_REPORTED_FREQ 5865
+
 typedef struct vtx3G3GridInfo_s {
     const char *        name;
     bool                trampMilliwatt;  // device takes real mW, not SX33 scale codes
     bool                saByFrequency;   // SmartAudio: always tune with SET_FREQ (device ignores SET_CHANNEL)
     bool                saPowerIndex;    // SmartAudio: power is the plain V2 level index, never dBm
+    bool                saChannelReadback; // SmartAudio: GET_SETTINGS reports the tuned channel index
     const uint16_t *    freq;         // bandCount rows of chanCount entries
     const char * const *bandNames;    // [bandCount + 1], index 0 is "-"
     const char * const *chanNames;    // [chanCount + 1], index 0 is "-"
@@ -363,6 +386,16 @@ static const vtx3G3GridInfo_t vtx3G3Grids[] = {
         .bandCount = VTX_STRING_3G3_T4137W4_BAND_COUNT, .chanCount = VTX_STRING_3G3_CHAN_COUNT,
         .powerCount = VTX_STRING_3G3_T4137W4_POWER_COUNT,
         .freqMin = 3700, .freqMax = 4080,
+    },
+    [VTX_3G3_GRID_TX3748] = {
+        .name = "TX3748", .saChannelReadback = true,
+        .freq = &vtx3G3frequencyTableTx3748[0][0],
+        .bandNames = vtx3G3Tx3748BandNames, .chanNames = vtx3G3ChannelNames,
+        .powerNames = vtx3G3Tx3704PowerNames,
+        .powerLevels = vtx3G3Tx3704PowerLevels, .powerDbm = vtx3G3Tx3704PowerDbm,
+        .bandCount = VTX_STRING_3G3_TX3748_BAND_COUNT, .chanCount = VTX_STRING_3G3_CHAN_COUNT,
+        .powerCount = VTX_STRING_3G3_TX3704_POWER_COUNT,
+        .freqMin = 3700, .freqMax = 4800,
     },
 };
 
@@ -450,6 +483,11 @@ void vtx3G3_ReportSmartAudioDevice(uint8_t version, uint16_t freq)
     // taken for a TX3704; everything else keeps the long-standing SX33 default.
     if (version == 2 && freq >= 3200 && freq <= 3700) {
         vtx3G3Report.grid = VTX_3G3_GRID_TX3704;
+        vtx3G3Report.detect = VTX_3G3_DETECT_RANGE;
+    } else if (version == 3 && freq == VTX_3G3_TX3748_REPORTED_FREQ) {
+        // The TX3748 answers V2.1 with a fixed 5865 in the frequency field,
+        // where the FF3741 answers 0x4000.
+        vtx3G3Report.grid = VTX_3G3_GRID_TX3748;
         vtx3G3Report.detect = VTX_3G3_DETECT_RANGE;
     } else {
         vtx3G3Report.grid = VTX_3G3_GRID_SX33;
@@ -637,6 +675,11 @@ bool vtx3G3_TrampPowerIsMilliwatt(void)
 bool vtx3G3_SmartAudioByFrequency(void)
 {
     return vtx3G3_Grid()->saByFrequency;
+}
+
+bool vtx3G3_SmartAudioChannelReadback(void)
+{
+    return vtx3G3_Grid()->saChannelReadback;
 }
 
 bool vtx3G3_SmartAudioPowerIsIndex(void)

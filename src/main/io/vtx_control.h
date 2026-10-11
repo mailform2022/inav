@@ -53,6 +53,7 @@ typedef enum {
     VTX_3G3_GRID_CUSTOM,       // user table from `vtxgrid` (any band, 1.2-7.2 GHz)
     VTX_3G3_GRID_TX3704,       // TX3704 SmartAudio V2: 5 bands A-E of 8, 3200-3700 MHz, 25mW..5W (5 levels)
     VTX_3G3_GRID_T4137W4,      // T4137W4 IRC Tramp: 3 bands A-C (8/8/4), 3700-4080 MHz, ramp/500mW/1W/2W/4W
+    VTX_3G3_GRID_TX3748,       // TX3748 SmartAudio V2.1: 7 bands A-G of 8, 3700-4800 MHz, tuned by channel index
     VTX_3G3_GRID_COUNT,
 } vtx3g3Grid_e;
 

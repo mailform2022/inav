@@ -57,6 +57,7 @@ bool vtx3G3_GridIsTx3339(void);
 const char * vtx3G3_GridName(void);
 bool vtx3G3_TrampPowerIsMilliwatt(void);
 bool vtx3G3_SmartAudioByFrequency(void);
+bool vtx3G3_SmartAudioChannelReadback(void);
 bool vtx3G3_SmartAudioPowerIsIndex(void);
 uint8_t vtx3G3_BandCount(void);
 uint8_t vtx3G3_ChannelCount(void);
