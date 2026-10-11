@@ -3942,6 +3942,32 @@ groups:
         min: 10
         max: 1000
         type: uint16_t
+      - name: vtx_rc_sync
+        description: "Learn how the RC link maps the transmitter's -100 / 0 / +100 on the VTX map channel (`vtx_curtain_channel`, or the channel of the first VTX map entry). While disarmed the transmitter sends a 0.6 s burst -100, +100, 0, -100, +100, 0 (100 ms per step); the received values are stored in `vtx_rc_sync_low/mid/high`. Once calibrated, VTX map and curtain values are nominal: -100 = 1000, 0 = 1500, +100 = 2000 us (value = 1500 + 5 x percent), and keep working after a change of RC link. OFF (default): VTX map values are the received us, as before."
+        default_value: OFF
+        field: rcSync
+        type: bool
+      - name: vtx_rc_sync_low
+        description: "Received us for transmitter -100 on the VTX map channel, learned from the sync burst (`vtx_rc_sync`). 0 = not calibrated."
+        default_value: 0
+        field: rcSyncLow
+        min: 0
+        max: 2500
+        type: uint16_t
+      - name: vtx_rc_sync_mid
+        description: "Received us for transmitter 0 on the VTX map channel, learned from the sync burst (`vtx_rc_sync`)."
+        default_value: 0
+        field: rcSyncMid
+        min: 0
+        max: 2500
+        type: uint16_t
+      - name: vtx_rc_sync_high
+        description: "Received us for transmitter +100 on the VTX map channel, learned from the sync burst (`vtx_rc_sync`)."
+        default_value: 0
+        field: rcSyncHigh
+        min: 0
+        max: 2500
+        type: uint16_t
 
   - name: PG_VTX_SETTINGS_CONFIG
     type: vtxSettingsConfig_t

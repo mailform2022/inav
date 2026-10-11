@@ -17,6 +17,8 @@
 
 
 // Get target build configuration
+#include <string.h>
+
 #include "platform.h"
 #include "build/debug.h"
 
@@ -73,12 +75,16 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
 PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 1);
 PG_REGISTER(vtxCustomGridConfig_t, vtxCustomGridConfig, PG_VTX_CUSTOM_GRID, 0);
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 0);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 1);
 
 PG_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig,
       .mode = SETTING_VTX_CURTAIN_MODE_DEFAULT,
       .rcChannel = SETTING_VTX_CURTAIN_CHANNEL_DEFAULT,
       .offset = SETTING_VTX_CURTAIN_OFFSET_DEFAULT,
+      .rcSync = SETTING_VTX_RC_SYNC_DEFAULT,
+      .rcSyncLow = SETTING_VTX_RC_SYNC_LOW_DEFAULT,
+      .rcSyncMid = SETTING_VTX_RC_SYNC_MID_DEFAULT,
+      .rcSyncHigh = SETTING_VTX_RC_SYNC_HIGH_DEFAULT,
 );
 
 static uint8_t locked = 0;
@@ -164,9 +170,31 @@ static bool vtxRcMapEntryIsValid(const vtxRcMapEntry_t *entry)
         entry->rangeEnd >= entry->rangeStart;
 }
 
+bool vtxRcSyncCalibrated(void)
+{
+    const vtxCurtainConfig_t *cfg = vtxCurtainConfig();
+    return cfg->rcSync && cfg->rcSyncLow && cfg->rcSyncLow < cfg->rcSyncMid && cfg->rcSyncMid < cfg->rcSyncHigh;
+}
+
+// Received us -> nominal us (transmitter -100 = 1000, 0 = 1500, +100 = 2000),
+// so VTX map values set once keep matching after a change of RC link.
+int vtxRcSyncNormalize(int value)
+{
+    if (!vtxRcSyncCalibrated()) {
+        return value;
+    }
+
+    const vtxCurtainConfig_t *cfg = vtxCurtainConfig();
+    const int halfSpan = VTX_RC_SYNC_NOMINAL_MID - VTX_RC_SYNC_NOMINAL_LOW;
+    if (value <= cfg->rcSyncMid) {
+        return VTX_RC_SYNC_NOMINAL_MID - ((cfg->rcSyncMid - value) * halfSpan + (cfg->rcSyncMid - cfg->rcSyncLow) / 2) / (cfg->rcSyncMid - cfg->rcSyncLow);
+    }
+    return VTX_RC_SYNC_NOMINAL_MID + ((value - cfg->rcSyncMid) * halfSpan + (cfg->rcSyncHigh - cfg->rcSyncMid) / 2) / (cfg->rcSyncHigh - cfg->rcSyncMid);
+}
+
 static int rcMapChannelValue(uint8_t rcChannel)
 {
-    return rxGetChannelValue(rcChannel - 1);
+    return vtxRcSyncNormalize(rxGetChannelValue(rcChannel - 1));
 }
 
 // Lowest start and highest end of the pairs on one RC channel
@@ -368,3 +396,112 @@ void vtxCyclePower(const uint8_t powerStep)
 }
 
 #endif
+
+/*
+ * Sync burst sent by the transmitter on the VTX map channel while disarmed:
+ * -100, +100, 0, -100, +100, 0, each held for VTX_RC_SYNC_STEP_MS (100 ms).
+ * Every step is shorter than the VTX band/channel settle window, so the VTX is
+ * never retuned by the burst, and the whole burst lasts 0.6 s.
+ */
+#define VTX_RC_SYNC_STEPS            6
+#define VTX_RC_SYNC_STEP_MIN_MS      40
+#define VTX_RC_SYNC_STEP_MAX_MS      250
+#define VTX_RC_SYNC_FLAT_US          12
+#define VTX_RC_SYNC_REPEAT_US        15
+#define VTX_RC_SYNC_MIN_SPAN_US      400
+
+static uint8_t vtxRcSyncChannel(void)
+{
+    if (vtxCurtainConfig()->rcChannel) {
+        return vtxCurtainConfig()->rcChannel;
+    }
+
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (vtxRcMapEntryIsValid(entry)) {
+            return entry->rcChannel;
+        }
+    }
+
+    return 0;
+}
+
+static bool vtxRcSyncPatternFound(const uint16_t *step, uint16_t *low, uint16_t *mid, uint16_t *high)
+{
+    for (int i = 0; i < 3; i++) {
+        if (ABS(step[i] - step[i + 3]) > VTX_RC_SYNC_REPEAT_US) {
+            return false;
+        }
+    }
+
+    *low = (step[0] + step[3] + 1) / 2;
+    *high = (step[1] + step[4] + 1) / 2;
+    *mid = (step[2] + step[5] + 1) / 2;
+
+    if (*high < *low + VTX_RC_SYNC_MIN_SPAN_US) {
+        return false;
+    }
+
+    const uint16_t span = *high - *low;
+    return *mid > *low + span * 3 / 10 && *mid < *low + span * 7 / 10;
+}
+
+void vtxRcSyncUpdate(void)
+{
+    static uint16_t step[VTX_RC_SYNC_STEPS];
+    static uint8_t stepCount = 0;
+    static int flatRef = -1;
+    static uint32_t flatSum = 0;
+    static uint16_t flatSamples = 0;
+    static timeMs_t flatSinceMs = 0;
+
+    const uint8_t rcChannel = vtxRcSyncChannel();
+    if (!vtxCurtainConfig()->rcSync || !rcChannel || ARMING_FLAG(ARMED)) {
+        stepCount = 0;
+        flatRef = -1;
+        return;
+    }
+
+    const int value = rxGetChannelValue(rcChannel - 1);
+    const timeMs_t nowMs = millis();
+
+    if (flatRef >= 0 && ABS(value - flatRef) <= VTX_RC_SYNC_FLAT_US) {
+        flatSum += value;
+        flatSamples++;
+        return;
+    }
+
+    if (flatRef >= 0) {
+        const timeMs_t heldMs = nowMs - flatSinceMs;
+        if (heldMs > VTX_RC_SYNC_STEP_MAX_MS) {
+            stepCount = 0;
+        } else if (heldMs >= VTX_RC_SYNC_STEP_MIN_MS) {
+            if (stepCount == VTX_RC_SYNC_STEPS) {
+                memmove(&step[0], &step[1], sizeof(step[0]) * (VTX_RC_SYNC_STEPS - 1));
+                stepCount--;
+            }
+            step[stepCount++] = (flatSum + flatSamples / 2) / flatSamples;
+        }
+        // A shorter step is a frame caught in transit between two steps
+    }
+
+    flatRef = value;
+    flatSum = value;
+    flatSamples = 1;
+    flatSinceMs = nowMs;
+
+    uint16_t low, mid, high;
+    if (stepCount == VTX_RC_SYNC_STEPS && vtxRcSyncPatternFound(step, &low, &mid, &high)) {
+        stepCount = 0;
+        vtxCurtainConfig_t *cfg = vtxCurtainConfigMutable();
+        if (cfg->rcSyncLow != low || cfg->rcSyncMid != mid || cfg->rcSyncHigh != high) {
+            cfg->rcSyncLow = low;
+            cfg->rcSyncMid = mid;
+            cfg->rcSyncHigh = high;
+            saveConfigAndNotify();
+        } else {
+            beeper(BEEPER_ACTION_SUCCESS);
+        }
+        LOG_INFO(VTX, "RC sync on CH%u: %u/%u/%u us", rcChannel, low, mid, high);
+    }
+}

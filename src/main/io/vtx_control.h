@@ -134,9 +134,22 @@ typedef struct vtxCurtainConfig_s {
     uint8_t  mode;         // vtxCurtainRcMode_e
     uint8_t  rcChannel;    // 1..16, 0 = the channel of the first VTX map entry
     uint16_t offset;       // us, FIXED mode
+    uint8_t  rcSync;       // learn the transmitter's -100/0/+100 values from the sync burst
+    uint16_t rcSyncLow;    // us received for -100, 0 = not calibrated
+    uint16_t rcSyncMid;    // us received for 0
+    uint16_t rcSyncHigh;   // us received for +100
 } vtxCurtainConfig_t;
 
 PG_DECLARE(vtxCurtainConfig_t, vtxCurtainConfig);
+
+// Nominal scale of a synced channel: transmitter -100 / 0 / +100
+#define VTX_RC_SYNC_NOMINAL_LOW   1000
+#define VTX_RC_SYNC_NOMINAL_MID   1500
+#define VTX_RC_SYNC_NOMINAL_HIGH  2000
+
+bool vtxRcSyncCalibrated(void);
+int vtxRcSyncNormalize(int value);
+void vtxRcSyncUpdate(void);
 
 uint8_t vtxCurtainRcChannel(void);
 uint16_t vtxCurtainRcOffset(uint8_t rcChannel);

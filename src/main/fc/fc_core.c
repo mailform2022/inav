@@ -63,6 +63,7 @@
 #include "fc/runtime_config.h"
 
 #include "io/beeper.h"
+#include "io/vtx_control.h"
 #include "io/dashboard.h"
 #include "io/gps.h"
 #include "io/serial.h"
@@ -1012,6 +1013,9 @@ void taskUpdateRxMain(timeUs_t currentTimeUs)
 {
     processRx(currentTimeUs);
     isRXDataNew = true;
+#if defined(USE_VTX_CONTROL)
+    vtxRcSyncUpdate();
+#endif
 }
 
 // returns seconds
