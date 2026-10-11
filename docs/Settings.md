@@ -6342,6 +6342,46 @@ VTX RF power level to use. The exact number of mw depends on the VTX hardware.
 
 ---
 
+### vtx_rc_sync
+
+Learn how the RC link maps the transmitter's -100 / 0 / +100 on the VTX map channel (`vtx_curtain_channel`, or the channel of the first VTX map entry). While disarmed the transmitter sends a 0.6 s burst -100, +100, 0, -100, +100, 0 (100 ms per step); the received values are stored in `vtx_rc_sync_low/mid/high`. Once calibrated, VTX map and curtain values are nominal: -100 = 1000, 0 = 1500, +100 = 2000 us (value = 1500 + 5 x percent), and keep working after a change of RC link. OFF (default): VTX map values are the received us, as before.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| OFF | OFF | ON |
+
+---
+
+### vtx_rc_sync_high
+
+Received us for transmitter +100 on the VTX map channel, learned from the sync burst (`vtx_rc_sync`).
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 2500 |
+
+---
+
+### vtx_rc_sync_low
+
+Received us for transmitter -100 on the VTX map channel, learned from the sync burst (`vtx_rc_sync`). 0 = not calibrated.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 2500 |
+
+---
+
+### vtx_rc_sync_mid
+
+Received us for transmitter 0 on the VTX map channel, learned from the sync burst (`vtx_rc_sync`).
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 2500 |
+
+---
+
 ### vtx_smartaudio_alternate_softserial_method
 
 Enable the alternate softserial method. This is the method used in INAV 3.0 and ealier.
