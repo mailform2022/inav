@@ -6264,7 +6264,7 @@ RC channel (1-16) carrying the combined curtain/VTX value. 0 (default): the chan
 
 ### vtx_curtain_mode
 
-Privacy curtain on the VTX map channel, for receivers without a spare channel. OFF (default): the curtain follows only the USER3 mode and the VTX map works as before. FIXED: the transmitter adds `vtx_curtain_offset` (percent) to the value of the selected pair while the curtain is on, e.g. pair -80 % -> +20 % with offset 100. FLOAT: any value above the highest pair turns the curtain on and the pair is taken at value minus the span of all pairs on that channel plus 1 %. The setting applies to all pairs at once; the USER3 mode keeps working in every mode. With no pairs on the curtain channel (VTX without band/channel control) the transmitter sends 1000 (-100 %) for OFF and 1000 + |offset| for ON.
+Privacy curtain on the VTX map channel, for receivers without a spare channel. OFF (default): the curtain follows only the USER3 mode and the VTX map works as before. FIXED: the transmitter adds `vtx_curtain_offset` (percent) to the value of the selected pair while the curtain is on, e.g. pair -80 % -> +20 % with offset 100. FLOAT: any value above the highest pair turns the curtain on and the pair is taken at value minus (highest pair - lowest pair + 1 %); use exact pair values for FLOAT. The setting applies to all pairs at once; the USER3 mode keeps working in every mode. With no pairs on the curtain channel (VTX without band/channel control) the transmitter sends 1000 (-100 %) for OFF and 1000 + |offset| for ON.
 
 | Default | Min | Max |
 | --- | --- | --- |
@@ -6274,7 +6274,7 @@ Privacy curtain on the VTX map channel, for receivers without a spare channel. O
 
 ### vtx_curtain_offset
 
-Curtain offset in transmitter percent (-100..100, 1 % = 5 us on the nominal 1000-2000 scale) that the transmitter adds to the pair value in FIXED mode; negative values put the curtain below the pair. With vtx_rc_sync calibrated it follows the RC link, so the same percent works after a change of link. With no pairs mapped the curtain is ON from 1000 + |offset|. Must be larger than the span of the pairs so shifted values do not land on another pair. FLOAT ignores it and uses the span of the pairs + 1 %.
+Curtain offset in transmitter percent (-100..100, 1 % = 5 us on the nominal 1000-2000 scale) that the transmitter adds to the pair value in FIXED mode; negative values put the curtain below the pair. With vtx_rc_sync calibrated it follows the RC link, so the same percent works after a change of link. With no pairs mapped the curtain is ON from 1000 + |offset|. Must be larger than the span of the pairs so shifted values do not land on another pair. FLOAT ignores it and uses the distance between the lowest and the highest pair + 1 %.
 
 | Default | Min | Max |
 | --- | --- | --- |

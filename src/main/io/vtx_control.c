@@ -219,6 +219,33 @@ static bool vtxRcMapChannelSpan(uint8_t rcChannel, uint16_t *low, uint16_t *high
     return found;
 }
 
+// Distance between the centres of the lowest and the highest pair (the
+// transmitter's FLOAT offset is computed from the pair values)
+static bool vtxRcMapChannelCenterSpan(uint8_t rcChannel, int *span)
+{
+    bool found = false;
+    int low = 0;
+    int high = 0;
+
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (!vtxRcMapEntryIsValid(entry) || entry->rcChannel != rcChannel) {
+            continue;
+        }
+        const int center = (entry->rangeStart + entry->rangeEnd) / 2;
+        if (!found || center < low) {
+            low = center;
+        }
+        if (!found || center > high) {
+            high = center;
+        }
+        found = true;
+    }
+
+    *span = high - low;
+    return found;
+}
+
 // rcChannel == 0 matches the pairs of every channel
 static int8_t vtxRcMapMatch(uint8_t rcChannel, int shift)
 {
@@ -261,12 +288,11 @@ uint8_t vtxCurtainRcChannel(void)
 // Shift in us on the (synced) channel scale
 int16_t vtxCurtainRcOffset(uint8_t rcChannel)
 {
-    uint16_t low = 0;
-    uint16_t high = 0;
+    int span = 0;
 
     if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
-        if (rcChannel && vtxRcMapChannelSpan(rcChannel, &low, &high)) {
-            return high - low + VTX_RC_PERCENT_US;
+        if (rcChannel && vtxRcMapChannelCenterSpan(rcChannel, &span)) {
+            return span + VTX_RC_PERCENT_US;
         }
         return VTX_CURTAIN_RC_DEFAULT_OFFSET;
     }

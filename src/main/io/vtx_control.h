@@ -116,7 +116,9 @@ PG_DECLARE_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries);
  *   FIXED: curtain ON = pair value + vtx_curtain_offset (transmitter percent,
  *          VTX_RC_PERCENT_US per percent; negative shifts below the pair)
  *   FLOAT: curtain ON = any value above the highest pair; the pair is the one
- *          at value - (span of all pairs on that channel + one percent)
+ *          at value - (distance between the centres of the lowest and the
+ *          highest pair + one percent); use exact pairs so that the lowest
+ *          pair + offset lands above the highest one
  * With no pairs on the curtain channel (VTX without band/channel control) the
  * transmitter sends VTX_CURTAIN_RC_BASE for OFF and BASE + |offset| for ON.
  * The USER3 mode keeps working in every mode, so the separate-channel setup
