@@ -308,6 +308,11 @@ static const char * const vtx3G3Tx3748BandNames[VTX_STRING_3G3_TX3748_BAND_COUNT
     "-", "A", "B", "C", "D", "E", "F", "G",
 };
 
+// The TX3748 numbers its channels from 0: A0..A7 ... G0..G7
+static const char * const vtx3G3Tx3748ChannelNames[VTX_STRING_3G3_CHAN_COUNT + 1] = {
+    "-", "0", "1", "2", "3", "4", "5", "6", "7",
+};
+
 #define VTX_3G3_TX3748_REPORTED_FREQ 5865
 
 typedef struct vtx3G3GridInfo_s {
@@ -390,7 +395,7 @@ static const vtx3G3GridInfo_t vtx3G3Grids[] = {
     [VTX_3G3_GRID_TX3748] = {
         .name = "TX3748", .saChannelReadback = true,
         .freq = &vtx3G3frequencyTableTx3748[0][0],
-        .bandNames = vtx3G3Tx3748BandNames, .chanNames = vtx3G3ChannelNames,
+        .bandNames = vtx3G3Tx3748BandNames, .chanNames = vtx3G3Tx3748ChannelNames,
         .powerNames = vtx3G3Tx3704PowerNames,
         .powerLevels = vtx3G3Tx3704PowerLevels, .powerDbm = vtx3G3Tx3704PowerDbm,
         .bandCount = VTX_STRING_3G3_TX3748_BAND_COUNT, .chanCount = VTX_STRING_3G3_CHAN_COUNT,

@@ -1715,7 +1715,7 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
             sbufWriteU8(dst, vtxRcCurtainActive() ? 1 : 0);
             sbufWriteU8(dst, curtainChannel);
             sbufWriteU16(dst, curtainChannel ? rxGetChannelValue(curtainChannel - 1) : 0);
-            sbufWriteU16(dst, curtainChannel ? vtxCurtainRcOffset(curtainChannel) : 0);
+            sbufWriteU16(dst, (uint16_t)(curtainChannel ? vtxCurtainRcOffset(curtainChannel) : 0));
         }
         break;
 

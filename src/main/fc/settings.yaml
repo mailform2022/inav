@@ -3923,7 +3923,7 @@ groups:
     condition: USE_VTX_CONTROL
     members:
       - name: vtx_curtain_mode
-        description: "Privacy curtain on the VTX map channel, for receivers without a spare channel. OFF (default): the curtain follows only the USER3 mode and the VTX map works as before. FIXED: the transmitter adds `vtx_curtain_offset` to the value of the selected pair while the curtain is on, e.g. pair 1100 -> 1600. FLOAT: any value above the highest pair turns the curtain on and the pair is taken at value minus the span of all pairs on that channel. The setting applies to all pairs at once; the USER3 mode keeps working in every mode. With no pairs on the curtain channel (VTX without band/channel control) the transmitter sends 1000 for OFF and 1000 + offset for ON."
+        description: "Privacy curtain on the VTX map channel, for receivers without a spare channel. OFF (default): the curtain follows only the USER3 mode and the VTX map works as before. FIXED: the transmitter adds `vtx_curtain_offset` (percent) to the value of the selected pair while the curtain is on, e.g. pair -80 % -> +20 % with offset 100. FLOAT: any value above the highest pair turns the curtain on and the pair is taken at value minus the span of all pairs on that channel plus 1 %. The setting applies to all pairs at once; the USER3 mode keeps working in every mode. With no pairs on the curtain channel (VTX without band/channel control) the transmitter sends 1000 (-100 %) for OFF and 1000 + |offset| for ON."
         default_value: "OFF"
         field: mode
         table: vtx_curtain_modes
@@ -3936,12 +3936,12 @@ groups:
         max: 16
         type: uint8_t
       - name: vtx_curtain_offset
-        description: "Curtain offset in us added by the transmitter to the pair value in FIXED mode (also the ON value above 1000 when no pairs are mapped). Must be larger than the span of the pairs so shifted values do not land on another pair."
-        default_value: 500
+        description: "Curtain offset in transmitter percent (-100..100, 1 % = 5 us on the nominal 1000-2000 scale) that the transmitter adds to the pair value in FIXED mode; negative values put the curtain below the pair. With vtx_rc_sync calibrated it follows the RC link, so the same percent works after a change of link. With no pairs mapped the curtain is ON from 1000 + |offset|. Must be larger than the span of the pairs so shifted values do not land on another pair. FLOAT ignores it and uses the span of the pairs + 1 %."
+        default_value: 100
         field: offset
-        min: 10
-        max: 1000
-        type: uint16_t
+        min: -100
+        max: 100
+        type: int8_t
       - name: vtx_rc_sync
         description: "Learn how the RC link maps the transmitter's -100 / 0 / +100 on the VTX map channel (`vtx_curtain_channel`, or the channel of the first VTX map entry). While disarmed the transmitter sends a 0.6 s burst -100, +100, 0, -100, +100, 0 (100 ms per step); the received values are stored in `vtx_rc_sync_low/mid/high`. Once calibrated, VTX map and curtain values are nominal: -100 = 1000, 0 = 1500, +100 = 2000 us (value = 1500 + 5 x percent), and keep working after a change of RC link. OFF (default): VTX map values are the received us, as before."
         default_value: OFF

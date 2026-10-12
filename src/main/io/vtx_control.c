@@ -75,7 +75,7 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
 PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 1);
 PG_REGISTER(vtxCustomGridConfig_t, vtxCustomGridConfig, PG_VTX_CUSTOM_GRID, 0);
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 1);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 2);
 
 PG_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig,
       .mode = SETTING_VTX_CURTAIN_MODE_DEFAULT,
@@ -229,7 +229,8 @@ static int8_t vtxRcMapMatch(uint8_t rcChannel, int shift)
         }
 
         const int value = rcMapChannelValue(entry->rcChannel) - shift;
-        if (value >= entry->rangeStart && value <= entry->rangeEnd) {
+        const int slack = entry->rangeStart == entry->rangeEnd ? VTX_RC_MAP_EXACT_SLACK : 0;
+        if (value >= entry->rangeStart - slack && value <= entry->rangeEnd + slack) {
             return index;
         }
     }
@@ -257,19 +258,20 @@ uint8_t vtxCurtainRcChannel(void)
     return 0;
 }
 
-uint16_t vtxCurtainRcOffset(uint8_t rcChannel)
+// Shift in us on the (synced) channel scale
+int16_t vtxCurtainRcOffset(uint8_t rcChannel)
 {
     uint16_t low = 0;
     uint16_t high = 0;
 
     if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
         if (rcChannel && vtxRcMapChannelSpan(rcChannel, &low, &high)) {
-            return high - low + 1;
+            return high - low + VTX_RC_PERCENT_US;
         }
         return VTX_CURTAIN_RC_DEFAULT_OFFSET;
     }
 
-    return vtxCurtainConfig()->offset;
+    return vtxCurtainConfig()->offset * VTX_RC_PERCENT_US;
 }
 
 int8_t vtxRcMapFindEntry(void)
@@ -299,12 +301,12 @@ bool vtxRcCurtainActive(void)
     }
 
     const int value = rcMapChannelValue(rcChannel);
-    const uint16_t offset = vtxCurtainRcOffset(rcChannel);
+    const int offset = vtxCurtainRcOffset(rcChannel);
     uint16_t low = 0;
     uint16_t high = 0;
 
     if (!vtxRcMapChannelSpan(rcChannel, &low, &high)) {
-        active = value >= VTX_CURTAIN_RC_BASE + offset / 2;
+        active = value >= VTX_CURTAIN_RC_BASE + ABS(offset) / 2;
     } else if (vtxRcMapMatch(rcChannel, 0) >= 0) {
         active = false;
     } else if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
