@@ -41,6 +41,7 @@
 #include "io/osd.h"
 #include "io/vtx.h"
 #include "io/vtx_control.h"
+#include "io/vtx_string.h"
 
 #include "rx/rx.h"
 
@@ -75,7 +76,7 @@ PG_RESET_TEMPLATE(vtxConfig_t, vtxConfig,
 PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_VTX_RC_MAP, 1);
 PG_REGISTER(vtxCustomGridConfig_t, vtxCustomGridConfig, PG_VTX_CUSTOM_GRID, 0);
 
-PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 2);
+PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 3);
 
 PG_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig,
       .mode = SETTING_VTX_CURTAIN_MODE_DEFAULT,
@@ -85,6 +86,7 @@ PG_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig,
       .rcSyncLow = SETTING_VTX_RC_SYNC_LOW_DEFAULT,
       .rcSyncMid = SETTING_VTX_RC_SYNC_MID_DEFAULT,
       .rcSyncHigh = SETTING_VTX_RC_SYNC_HIGH_DEFAULT,
+      .preset = SETTING_VTX_RC_PRESET_DEFAULT,
 );
 
 static uint8_t locked = 0;
@@ -425,11 +427,63 @@ void vtxCyclePower(const uint8_t powerStep)
 
 #endif
 
+int vtxRcPresetPercent(uint8_t slot)
+{
+    return slot < VTX_RC_PRESET_PAIRS / 2 ? -90 + 9 * slot : 9 * (slot - VTX_RC_PRESET_PAIRS / 2 + 1);
+}
+
+/*
+ * Fill the map with the default pairs of a grid: its band/channel cells in table
+ * order on the 20 preset transmitter values, maximum power, FIXED curtain.
+ */
+bool vtxRcPresetApply(uint8_t grid, uint8_t rcChannel)
+{
+    uint8_t bands, chans, powers;
+    if (!rcChannel || rcChannel > VTX_RC_MAP_CHANNEL_COUNT ||
+        !vtx3G3_GridPresetInfo(grid, &bands, &chans, &powers)) {
+        return false;
+    }
+
+    vtxConfigMutable()->vtx3g3Grid = grid;
+    vtxSettingsConfigMutable()->frequencyGroup = FREQUENCYGROUP_3G3;
+    vtxSettingsConfigMutable()->power = powers;
+
+    uint8_t slot = 0;
+    for (uint8_t band = 1; band <= bands && slot < VTX_RC_PRESET_PAIRS; band++) {
+        for (uint8_t chan = 1; chan <= chans && slot < VTX_RC_PRESET_PAIRS; chan++) {
+            if (!vtx3G3_GridFrequency(grid, band, chan)) {
+                continue;
+            }
+            vtxRcMapEntry_t *entry = vtxRcMapEntriesMutable(slot);
+            const uint16_t value = VTX_RC_SYNC_NOMINAL_MID + vtxRcPresetPercent(slot) * VTX_RC_PERCENT_US;
+            entry->rcChannel = rcChannel;
+            entry->band = band;
+            entry->channel = chan;
+            entry->power = powers;
+            entry->rangeStart = value;
+            entry->rangeEnd = value;
+            slot++;
+        }
+    }
+    for (; slot < MAX_VTX_RC_MAP_ENTRIES; slot++) {
+        memset(vtxRcMapEntriesMutable(slot), 0, sizeof(vtxRcMapEntry_t));
+    }
+
+    vtxCurtainConfig_t *cfg = vtxCurtainConfigMutable();
+    cfg->mode = VTX_CURTAIN_RC_FIXED;
+    cfg->rcChannel = rcChannel;
+    cfg->offset = VTX_RC_PRESET_CURTAIN_OFFSET;
+    cfg->preset = grid;
+    return true;
+}
+
 /*
  * Sync burst sent by the transmitter on the VTX map channel while disarmed:
- * -100, +100, 0, -100, +100, 0, each held for VTX_RC_SYNC_STEP_MS (100 ms).
+ * -100, +100, 0, -100, +100, 0, each held for 100 ms, optionally followed by a
+ * VTX marker step (-85 + 10 x grid %) and a return to 0. The marker makes the
+ * FC load the default pairs of that grid; without it only the scale is learned.
  * Every step is shorter than the VTX band/channel settle window, so the VTX is
- * never retuned by the burst, and the whole burst lasts 0.6 s.
+ * never retuned by the burst.
  */
 #define VTX_RC_SYNC_STEPS            6
 #define VTX_RC_SYNC_STEP_MIN_MS      40
@@ -437,6 +491,10 @@ void vtxCyclePower(const uint8_t powerStep)
 #define VTX_RC_SYNC_FLAT_US          12
 #define VTX_RC_SYNC_REPEAT_US        15
 #define VTX_RC_SYNC_MIN_SPAN_US      400
+#define VTX_RC_SYNC_MARKER_WAIT_MS   400
+#define VTX_RC_SYNC_MARKER_BASE      -85
+#define VTX_RC_SYNC_MARKER_STEP      10
+#define VTX_RC_SYNC_MARKER_TOL       3
 
 static uint8_t vtxRcSyncChannel(void)
 {
@@ -474,6 +532,48 @@ static bool vtxRcSyncPatternFound(const uint16_t *step, uint16_t *low, uint16_t 
     return *mid > *low + span * 3 / 10 && *mid < *low + span * 7 / 10;
 }
 
+static int vtxRcSyncMarkerGrid(uint16_t value)
+{
+    const int percent = (vtxRcSyncNormalize(value) - VTX_RC_SYNC_NOMINAL_MID) / VTX_RC_PERCENT_US;
+    const int offset = percent - VTX_RC_SYNC_MARKER_BASE;
+    if (offset < -VTX_RC_SYNC_MARKER_TOL) {
+        return -1;
+    }
+    const int grid = (offset + VTX_RC_SYNC_MARKER_STEP / 2) / VTX_RC_SYNC_MARKER_STEP;
+    if (ABS(offset - grid * VTX_RC_SYNC_MARKER_STEP) > VTX_RC_SYNC_MARKER_TOL ||
+        grid >= VTX_3G3_GRID_COUNT || grid == VTX_3G3_GRID_AUTO) {
+        return -1;
+    }
+    return grid;
+}
+
+static bool vtxRcMapIsEmpty(void)
+{
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        if (vtxRcMapEntryIsValid(vtxRcMapEntries(index))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void vtxRcSyncFinish(bool calibrationChanged, int markerGrid, uint8_t rcChannel)
+{
+    bool changed = calibrationChanged;
+
+    if (markerGrid >= 0 && (markerGrid != vtxCurtainConfig()->preset || vtxRcMapIsEmpty())) {
+        changed |= vtxRcPresetApply(markerGrid, rcChannel);
+    }
+
+    if (changed) {
+        saveConfigAndNotify();
+    } else {
+        beeper(BEEPER_ACTION_SUCCESS);
+    }
+    LOG_INFO(VTX, "RC sync on CH%u: %u/%u/%u us, VTX %d", rcChannel,
+        vtxCurtainConfig()->rcSyncLow, vtxCurtainConfig()->rcSyncMid, vtxCurtainConfig()->rcSyncHigh, markerGrid);
+}
+
 void vtxRcSyncUpdate(void)
 {
     static uint16_t step[VTX_RC_SYNC_STEPS];
@@ -482,16 +582,25 @@ void vtxRcSyncUpdate(void)
     static uint32_t flatSum = 0;
     static uint16_t flatSamples = 0;
     static timeMs_t flatSinceMs = 0;
+    static bool markerPending = false;
+    static bool markerCalibrationChanged = false;
+    static timeMs_t markerSinceMs = 0;
 
     const uint8_t rcChannel = vtxRcSyncChannel();
     if (!vtxCurtainConfig()->rcSync || !rcChannel || ARMING_FLAG(ARMED)) {
         stepCount = 0;
         flatRef = -1;
+        markerPending = false;
         return;
     }
 
     const int value = rxGetChannelValue(rcChannel - 1);
     const timeMs_t nowMs = millis();
+
+    if (markerPending && nowMs - markerSinceMs > VTX_RC_SYNC_MARKER_WAIT_MS) {
+        markerPending = false;
+        vtxRcSyncFinish(markerCalibrationChanged, -1, rcChannel);
+    }
 
     if (flatRef >= 0 && ABS(value - flatRef) <= VTX_RC_SYNC_FLAT_US) {
         flatSum += value;
@@ -501,14 +610,19 @@ void vtxRcSyncUpdate(void)
 
     if (flatRef >= 0) {
         const timeMs_t heldMs = nowMs - flatSinceMs;
-        if (heldMs > VTX_RC_SYNC_STEP_MAX_MS) {
+        const uint16_t held = (flatSum + flatSamples / 2) / flatSamples;
+        if (markerPending && heldMs >= VTX_RC_SYNC_STEP_MIN_MS) {
+            markerPending = false;
+            const int grid = heldMs <= VTX_RC_SYNC_STEP_MAX_MS ? vtxRcSyncMarkerGrid(held) : -1;
+            vtxRcSyncFinish(markerCalibrationChanged, grid, rcChannel);
+        } else if (heldMs > VTX_RC_SYNC_STEP_MAX_MS) {
             stepCount = 0;
         } else if (heldMs >= VTX_RC_SYNC_STEP_MIN_MS) {
             if (stepCount == VTX_RC_SYNC_STEPS) {
                 memmove(&step[0], &step[1], sizeof(step[0]) * (VTX_RC_SYNC_STEPS - 1));
                 stepCount--;
             }
-            step[stepCount++] = (flatSum + flatSamples / 2) / flatSamples;
+            step[stepCount++] = held;
         }
         // A shorter step is a frame caught in transit between two steps
     }
@@ -519,17 +633,14 @@ void vtxRcSyncUpdate(void)
     flatSinceMs = nowMs;
 
     uint16_t low, mid, high;
-    if (stepCount == VTX_RC_SYNC_STEPS && vtxRcSyncPatternFound(step, &low, &mid, &high)) {
+    if (!markerPending && stepCount == VTX_RC_SYNC_STEPS && vtxRcSyncPatternFound(step, &low, &mid, &high)) {
         stepCount = 0;
         vtxCurtainConfig_t *cfg = vtxCurtainConfigMutable();
-        if (cfg->rcSyncLow != low || cfg->rcSyncMid != mid || cfg->rcSyncHigh != high) {
-            cfg->rcSyncLow = low;
-            cfg->rcSyncMid = mid;
-            cfg->rcSyncHigh = high;
-            saveConfigAndNotify();
-        } else {
-            beeper(BEEPER_ACTION_SUCCESS);
-        }
-        LOG_INFO(VTX, "RC sync on CH%u: %u/%u/%u us", rcChannel, low, mid, high);
+        markerCalibrationChanged = cfg->rcSyncLow != low || cfg->rcSyncMid != mid || cfg->rcSyncHigh != high;
+        cfg->rcSyncLow = low;
+        cfg->rcSyncMid = mid;
+        cfg->rcSyncHigh = high;
+        markerPending = true;
+        markerSinceMs = nowMs;
     }
 }

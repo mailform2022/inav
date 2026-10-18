@@ -2207,6 +2207,28 @@ static void cliVtxMap(char *cmdline)
         return;
     }
 
+    if (sl_strncasecmp(cmdline, "preset", 6) == 0) {
+        const char *name = cmdline + 6;
+        while (*name == ' ') {
+            name++;
+        }
+        const setting_t *presetSetting = settingFind("vtx_rc_preset");
+        const lookupTableEntry_t *table = presetSetting ? settingLookupTable(presetSetting) : NULL;
+        int grid = -1;
+        for (int i = 0; table && i < table->valueCount; i++) {
+            if (sl_strcasecmp(name, table->values[i]) == 0) {
+                grid = i;
+            }
+        }
+        const uint8_t rcChannel = vtxCurtainRcChannel() ? vtxCurtainRcChannel() : VTX_RC_PRESET_DEFAULT_CHANNEL;
+        if (grid < 0 || !vtxRcPresetApply(grid, rcChannel)) {
+            cliShowParseError();
+            return;
+        }
+        printVtxMap(DUMP_MASTER, vtxRcMapEntries(0), NULL);
+        return;
+    }
+
     if (sl_strncasecmp(cmdline, "status", 6) == 0) {
         const uint8_t curtainChannel = vtxCurtainRcChannel();
         cliPrintLinef("# vtxmap entry %d curtain %s ch %d value %d offset %d",
@@ -4815,7 +4837,8 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("vtxmap", "map an RC channel value to a VTX band/channel",
         "<index> <rc channel 1-16> <band> <channel> <power, 0 keeps current> <range start us> <range end us>\r\n"
         "\treset\r\n"
-        "\tstatus\r\n", cliVtxMap),
+        "\tstatus\r\n"
+        "\tpreset <vtx_3g3_grid name>\r\n", cliVtxMap),
     CLI_COMMAND_DEF("vtxgrid", "user VTX frequency table for vtx_3g3_grid = CUSTOM",
         "band <1-8> <MHz per channel, up to 20>\r\n"
         "\tpower <1-8> <mW> [tramp code, 0 = mW] [dBm]\r\n"

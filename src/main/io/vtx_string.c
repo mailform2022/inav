@@ -402,6 +402,15 @@ static const vtx3G3GridInfo_t vtx3G3Grids[] = {
         .powerCount = VTX_STRING_3G3_TX3704_POWER_COUNT,
         .freqMin = 3700, .freqMax = 4800,
     },
+    [VTX_3G3_GRID_FF3741] = {
+        .name = "FF3741", .freq = &vtx3G3frequencyTable[0][0],
+        .bandNames = vtx3G3BandNames, .chanNames = vtx3G3ChannelNames,
+        .powerNames = vtx3G3DefaultPowerNames,
+        .powerLevels = vtx3G3PowerLevels, .powerDbm = vtx3G3PowerDbm,
+        .bandCount = VTX_STRING_3G3_BAND_COUNT, .chanCount = VTX_STRING_3G3_CHAN_COUNT,
+        .powerCount = VTX_STRING_3G3_POWER_COUNT,
+        .freqMin = 3200, .freqMax = 3700,
+    },
 };
 
 /* What the attached VTX said about itself, kept raw so a wrong guess can be traced
@@ -641,9 +650,8 @@ uint16_t vtx3G3_TrampPowerCode(uint8_t index, uint16_t milliwatt)
 }
 #endif
 
-static const vtx3G3GridInfo_t * vtx3G3_Grid(void)
+static const vtx3G3GridInfo_t * vtx3G3_GridById(uint8_t grid)
 {
-    const uint8_t grid = vtx3G3_EffectiveGrid();
 
 #if defined(USE_VTX_CONTROL)
     if (grid == VTX_3G3_GRID_CUSTOM) {
@@ -660,6 +668,32 @@ static const vtx3G3GridInfo_t * vtx3G3_Grid(void)
         return &vtx3G3Grids[VTX_3G3_GRID_SX33];
     }
     return &vtx3G3Grids[grid];
+}
+
+static const vtx3G3GridInfo_t * vtx3G3_Grid(void)
+{
+    return vtx3G3_GridById(vtx3G3_EffectiveGrid());
+}
+
+bool vtx3G3_GridPresetInfo(uint8_t grid, uint8_t *bands, uint8_t *chans, uint8_t *powers)
+{
+    if (grid >= VTX_3G3_GRID_COUNT || grid == VTX_3G3_GRID_AUTO) {
+        return false;
+    }
+    const vtx3G3GridInfo_t *info = vtx3G3_GridById(grid);
+    *bands = info->bandCount;
+    *chans = info->chanCount;
+    *powers = info->powerCount;
+    return info->bandCount && info->chanCount && info->powerCount;
+}
+
+uint16_t vtx3G3_GridFrequency(uint8_t grid, uint8_t band, uint8_t channel)
+{
+    const vtx3G3GridInfo_t *info = vtx3G3_GridById(grid);
+    if (band == 0 || band > info->bandCount || channel == 0 || channel > info->chanCount) {
+        return 0;
+    }
+    return info->freq[(band - 1) * info->chanCount + (channel - 1)];
 }
 
 bool vtx3G3_GridIsTx3339(void)

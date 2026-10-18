@@ -53,6 +53,8 @@ const vtx3G3DeviceReport_t * vtx3G3_DeviceReport(void);
 uint8_t vtx3G3_DetectSource(void);
 
 uint8_t vtx3G3_EffectiveGrid(void);
+bool vtx3G3_GridPresetInfo(uint8_t grid, uint8_t *bands, uint8_t *chans, uint8_t *powers);
+uint16_t vtx3G3_GridFrequency(uint8_t grid, uint8_t band, uint8_t channel);
 bool vtx3G3_GridIsTx3339(void);
 const char * vtx3G3_GridName(void);
 bool vtx3G3_TrampPowerIsMilliwatt(void);

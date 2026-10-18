@@ -54,6 +54,7 @@ typedef enum {
     VTX_3G3_GRID_TX3704,       // TX3704 SmartAudio V2: 5 bands A-E of 8, 3200-3700 MHz, 25mW..5W (5 levels)
     VTX_3G3_GRID_T4137W4,      // T4137W4 IRC Tramp: 3 bands A-C (8/8/4), 3700-4080 MHz, ramp/500mW/1W/2W/4W
     VTX_3G3_GRID_TX3748,       // TX3748 SmartAudio V2.1: 7 bands A-G of 8, 3700-4800 MHz, tuned by channel index
+    VTX_3G3_GRID_FF3741,       // FF3741: SX33 table under its own name
     VTX_3G3_GRID_COUNT,
 } vtx3g3Grid_e;
 
@@ -145,6 +146,7 @@ typedef struct vtxCurtainConfig_s {
     uint16_t rcSyncLow;    // us received for -100, 0 = not calibrated
     uint16_t rcSyncMid;    // us received for 0
     uint16_t rcSyncHigh;   // us received for +100
+    uint8_t  preset;       // grid whose default pairs fill the map, VTX_RC_PRESET_NONE = hand-made map
 } vtxCurtainConfig_t;
 
 PG_DECLARE(vtxCurtainConfig_t, vtxCurtainConfig);
@@ -153,6 +155,15 @@ PG_DECLARE(vtxCurtainConfig_t, vtxCurtainConfig);
 #define VTX_RC_SYNC_NOMINAL_LOW   1000
 #define VTX_RC_SYNC_NOMINAL_MID   1500
 #define VTX_RC_SYNC_NOMINAL_HIGH  2000
+
+// Default pairs: 20 transmitter values, -90..-9 and +9..+90 in 9 % steps (0 % is left out)
+#define VTX_RC_PRESET_PAIRS           20
+#define VTX_RC_PRESET_CURTAIN_OFFSET  4
+#define VTX_RC_PRESET_NONE            VTX_3G3_GRID_COUNT
+#define VTX_RC_PRESET_DEFAULT_CHANNEL 9
+
+int vtxRcPresetPercent(uint8_t slot);
+bool vtxRcPresetApply(uint8_t grid, uint8_t rcChannel);
 
 bool vtxRcSyncCalibrated(void);
 int vtxRcSyncNormalize(int value);

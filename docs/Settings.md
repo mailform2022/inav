@@ -6258,7 +6258,7 @@ RC channel (1-16) carrying the combined curtain/VTX value. 0 (default): the chan
 
 | Default | Min | Max |
 | --- | --- | --- |
-| 0 | 0 | 16 |
+| 9 | 0 | 16 |
 
 ---
 
@@ -6342,13 +6342,23 @@ VTX RF power level to use. The exact number of mw depends on the VTX hardware.
 
 ---
 
-### vtx_rc_sync
+### vtx_rc_preset
 
-Learn how the RC link maps the transmitter's -100 / 0 / +100 on the VTX map channel (`vtx_curtain_channel`, or the channel of the first VTX map entry). While disarmed the transmitter sends a 0.6 s burst -100, +100, 0, -100, +100, 0 (100 ms per step); the received values are stored in `vtx_rc_sync_low/mid/high`. Once calibrated, VTX map and curtain values are nominal: -100 = 1000, 0 = 1500, +100 = 2000 us (value = 1500 + 5 x percent), and keep working after a change of RC link. OFF (default): VTX map values are the received us, as before.
+VTX whose default pairs were last loaded into the VTX map (by the sync marker from the transmitter or `vtxmap preset`). A sync marker for the same VTX keeps hand edits of the map; a different VTX reloads its 20 default pairs. NONE = the map was made by hand
 
 | Default | Min | Max |
 | --- | --- | --- |
-| OFF | OFF | ON |
+| NONE |  |  |
+
+---
+
+### vtx_rc_sync
+
+Learn how the RC link maps the transmitter's -100 / 0 / +100 on the VTX map channel (`vtx_curtain_channel`, or the channel of the first VTX map entry). While disarmed the transmitter sends a 0.6 s burst -100, +100, 0, -100, +100, 0 (100 ms per step); the received values are stored in `vtx_rc_sync_low/mid/high`. Once calibrated, VTX map and curtain values are nominal: -100 = 1000, 0 = 1500, +100 = 2000 us (value = 1500 + 5 x percent), and keep working after a change of RC link. A VTX marker step after the burst (-85 + 10 x grid index %) loads that VTX's default pairs (see `vtx_rc_preset`). ON (default) listens on the channel whenever disarmed; OFF: VTX map values are the received us, as before.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| ON | OFF | ON |
 
 ---
 
