@@ -69,9 +69,25 @@ typedef struct pinioRuntime_s {
     bool inverted;
     bool hizIdle;
     bool state;
+    bool on;
+    pinioIdleLevel_e idleLevel;
 } pinioRuntime_t;
 
 static pinioRuntime_t pinioRuntime[PINIO_COUNT];
+
+static void pinioApplyIdle(int index)
+{
+    switch (pinioRuntime[index].idleLevel) {
+    case PINIO_IDLE_LOW:
+    case PINIO_IDLE_HIGH:
+        IOConfigGPIO(pinioRuntime[index].io, pinioRuntime[index].ioMode);
+        IOWrite(pinioRuntime[index].io, pinioRuntime[index].idleLevel == PINIO_IDLE_HIGH);
+        break;
+    default:
+        IOConfigGPIO(pinioRuntime[index].io, IOCFG_IN_FLOATING);
+        break;
+    }
+}
 
 void pinioInit(void)
 {
@@ -101,6 +117,8 @@ void pinioInit(void)
 
         pinioRuntime[i].io = io;
         pinioRuntime[i].state = false;
+        pinioRuntime[i].on = false;
+        pinioRuntime[i].idleLevel = PINIO_IDLE_HIZ;
     }
 }
 
@@ -123,12 +141,38 @@ void pinioSet(int index, bool on)
             IOConfigGPIO(pinioRuntime[index].io, pinioRuntime[index].ioMode);
             IOWrite(pinioRuntime[index].io, newState);
         } else {
-            IOConfigGPIO(pinioRuntime[index].io, IOCFG_IN_FLOATING);
+            pinioApplyIdle(index);
         }
     } else {
         IOWrite(pinioRuntime[index].io, newState);
     }
 
     pinioRuntime[index].state = newState;
+    pinioRuntime[index].on = on;
+}
+
+void pinioSetIdleLevel(int index, pinioIdleLevel_e level)
+{
+    if (index < 0 || index >= pinioHardwareCount || !pinioRuntime[index].io || !pinioRuntime[index].hizIdle) {
+        return;
+    }
+
+    pinioRuntime[index].idleLevel = level;
+    if (!pinioRuntime[index].on) {
+        pinioApplyIdle(index);
+    }
+}
+
+pinioIdleLevel_e pinioGetIdleLevel(int index)
+{
+    if (index < 0 || index >= pinioHardwareCount) {
+        return PINIO_IDLE_HIZ;
+    }
+    return pinioRuntime[index].idleLevel;
+}
+
+bool pinioIsOn(int index)
+{
+    return index >= 0 && index < pinioHardwareCount && pinioRuntime[index].on;
 }
 #endif

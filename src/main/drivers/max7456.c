@@ -43,6 +43,9 @@
 #include "drivers/light_led.h"
 #include "drivers/nvic.h"
 #include "drivers/time.h"
+#include "drivers/pinio.h"
+
+#include "fc/runtime_config.h"
 
 #include "max7456.h"
 
@@ -590,6 +593,46 @@ static bool max7456DrawScreenPartial(void)
     return false;
 }
 
+#if defined(MAX7456_CAMERA_SELECT_PINIO) && defined(USE_PINIO)
+#define CAMERA_SELECT_POLL_MS   100
+#define CAMERA_SELECT_DWELL_MS  600
+
+// The camera input of some airframes only carries a picture with the camera
+// select pin at one particular level (released, low or high), which differs
+// from board to board. While disarmed and with the pin not forced by its
+// PINIO box, step through the levels until the chip reports a locked input,
+// then hold that level.
+static void max7456CameraSelectUpdate(timeMs_t nowMs)
+{
+    static timeMs_t lastPollMs = 0;
+    static timeMs_t losSinceMs = 0;
+    uint8_t statReg;
+
+    if (nowMs - lastPollMs < CAMERA_SELECT_POLL_MS) {
+        return;
+    }
+    lastPollMs = nowMs;
+
+    if (ARMING_FLAG(ARMED) || pinioIsOn(MAX7456_CAMERA_SELECT_PINIO)) {
+        losSinceMs = 0;
+        return;
+    }
+
+    if (!busRead(state.dev, MAX7456ADD_STAT, &statReg) || !(statReg & STAT_LOS)) {
+        losSinceMs = 0;
+        return;
+    }
+
+    if (losSinceMs == 0) {
+        losSinceMs = nowMs;
+    } else if (nowMs - losSinceMs >= CAMERA_SELECT_DWELL_MS) {
+        const pinioIdleLevel_e next = (pinioGetIdleLevel(MAX7456_CAMERA_SELECT_PINIO) + 1) % PINIO_IDLE_COUNT;
+        pinioSetIdleLevel(MAX7456_CAMERA_SELECT_PINIO, next);
+        losSinceMs = nowMs;
+    }
+}
+#endif
+
 // Must be called with the lock held
 static void max7456StallCheck(void)
 {
@@ -603,6 +646,10 @@ static void max7456StallCheck(void)
         max7456ReInit();
         return;
     }
+
+#if defined(MAX7456_CAMERA_SELECT_PINIO) && defined(USE_PINIO)
+    max7456CameraSelectUpdate(millis());
+#endif
 
     if (state.videoSystem == VIDEO_SYSTEM_AUTO) {
         timeMs_t nowMs = millis();

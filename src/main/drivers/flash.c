@@ -31,6 +31,7 @@
 #include "flash.h"
 #include "flash_m25p16.h"
 #include "flash_w25n01g.h"
+#include "flash_stm32f4_internal.h"
 
 #include "common/time.h"
 
@@ -70,6 +71,20 @@ static flashDriver_t flashDrivers[] = {
     },
 #endif
 
+#endif
+
+#if defined(USE_FLASH_INTERNAL) && defined(STM32F4)
+    {
+        .init = stm32f4intflash_init,
+        .isReady = stm32f4intflash_isReady,
+        .waitForReady = stm32f4intflash_waitForReady,
+        .eraseSector = stm32f4intflash_eraseSector,
+        .eraseCompletely = stm32f4intflash_eraseCompletely,
+        .pageProgram = stm32f4intflash_pageProgram,
+        .readBytes = stm32f4intflash_readBytes,
+        .getGeometry = stm32f4intflash_getGeometry,
+        .flush = stm32f4intflash_flush
+    },
 #endif
 
 };
@@ -194,8 +209,9 @@ static __attribute__((unused)) void createPartition(flashPartitionType_e type, u
     }
 
     if (partitionSectors > *endSector + 1) {
-        // Device too small for this partition; leave it out so the sector
-        // arithmetic below does not wrap and swallow the FLASHFS partition.
+        // Device too small for this partition (e.g. a 256 KB internal-flash log
+        // device can not hold a 1 MB firmware backup); leave it out so the
+        // sector arithmetic below does not wrap and swallow the FLASHFS partition.
         return;
     }
 
@@ -227,7 +243,7 @@ static void flashConfigurePartitions(void)
 
 #if defined(MSP_FIRMWARE_UPDATE)
     // The update/backup partitions each need a full MCU image; a small device
-    // keeps all of its space for FLASHFS instead.
+    // (the internal-flash log) keeps all of its space for FLASHFS instead.
     if ((uint64_t)(endSector + 1) * flashGeometry->sectorSize >= 2ULL * MCU_FLASH_SIZE * 1024 + flashGeometry->sectorSize) {
         createPartition(FLASH_PARTITION_TYPE_FIRMWARE_UPDATE_META, flashGeometry->sectorSize, &endSector);
         createPartition(FLASH_PARTITION_TYPE_UPDATE_FIRMWARE, MCU_FLASH_SIZE * 1024, &endSector);

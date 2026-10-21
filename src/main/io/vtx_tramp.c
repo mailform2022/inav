@@ -42,6 +42,7 @@
 #include "io/vtx_control.h"
 #include "io/vtx.h"
 #include "io/vtx_string.h"
+#include "io/vtx_trace.h"
 
 #define VTX_PKT_SIZE                16
 #define VTX_PROTO_STATE_TIMEOUT_MS  1000
@@ -150,6 +151,9 @@ static bool vtxProtoRecv(void)
     uint8_t * bufPtr = (uint8_t*)&vtxState.recvPkt;
     while (serialRxBytesWaiting(vtxState.port)) {
         const uint8_t c = serialRead(vtxState.port);
+#ifdef USE_VTX_TRACE
+        vtxTraceRxByte(VTX_TRACE_PROTO_TRAMP, c);
+#endif
 
         if (vtxState.recvPtr == 0) {
             // Wait for sync byte
@@ -207,6 +211,9 @@ static void vtxProtoSend(uint8_t cmd, uint16_t param)
 
     // Send data 
     serialWriteBuf(vtxState.port, (uint8_t *)&vtxState.sendPkt, sizeof(vtxState.sendPkt));
+#ifdef USE_VTX_TRACE
+    vtxTraceTx(VTX_TRACE_PROTO_TRAMP, (const uint8_t *)&vtxState.sendPkt, sizeof(vtxState.sendPkt));
+#endif
 
     // Reset cmd response state
     vtxState.recvPtr = 0;

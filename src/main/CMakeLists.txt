@@ -178,6 +178,8 @@ main_sources(COMMON_SRC
     drivers/flash_m25p16.h
     drivers/flash_w25n01g.c
     drivers/flash_w25n01g.h
+    drivers/flash_stm32f4_internal.c
+    drivers/flash_stm32f4_internal.h
     drivers/io.c
     drivers/io.h
     drivers/io_pcf8574.c
@@ -541,6 +543,8 @@ main_sources(COMMON_SRC
     io/vtx_smartaudio.h
     io/vtx_tramp.c
     io/vtx_tramp.h
+    io/vtx_trace.c
+    io/vtx_trace.h
     io/vtx_ffpv24g.c
     io/vtx_ffpv24g.h
     io/vtx_control.c

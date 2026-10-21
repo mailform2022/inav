@@ -40,5 +40,16 @@ typedef struct pinioHardware_s {
 extern const pinioHardware_t pinioHardware[];
 extern const int pinioHardwareCount;
 
+typedef enum {
+    PINIO_IDLE_HIZ = 0,
+    PINIO_IDLE_LOW,
+    PINIO_IDLE_HIGH,
+    PINIO_IDLE_COUNT
+} pinioIdleLevel_e;
+
 void pinioInit(void);
 void pinioSet(int index, bool on);
+// Level a PINIO_FLAGS_HIZ_IDLE pin takes while its PINIO is off.
+void pinioSetIdleLevel(int index, pinioIdleLevel_e level);
+pinioIdleLevel_e pinioGetIdleLevel(int index);
+bool pinioIsOn(int index);
