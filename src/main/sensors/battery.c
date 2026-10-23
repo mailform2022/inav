@@ -51,6 +51,8 @@
 #include "config/feature.h"
 
 #include "sensors/battery.h"
+#include "sensors/gyro.h"
+#include "sensors/sensors.h"
 #include "sensors/esc_sensor.h"
 
 #include "rx/rx.h"
@@ -201,6 +203,15 @@ void batteryInit(void)
     batteryFullVoltage = 0;
     batteryWarningVoltage = 0;
     batteryCriticalVoltage = 0;
+
+#if defined(CURRENT_METER_VIRTUAL_GYRO)
+    // Boards with this gyro have no usable ADC current sensor: fall back to the virtual meter
+    if (detectedSensors[SENSOR_INDEX_GYRO] == CURRENT_METER_VIRTUAL_GYRO &&
+        batteryMetersConfig()->current.type == CURRENT_SENSOR_ADC) {
+        batteryMetersConfigMutable()->current.type = CURRENT_SENSOR_VIRTUAL;
+        batteryMetersConfigMutable()->current.scale = CURRENT_METER_VIRTUAL_GYRO_SCALE;
+    }
+#endif
 }
 
 #ifdef USE_ADC
