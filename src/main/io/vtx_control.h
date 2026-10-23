@@ -115,7 +115,7 @@ PG_DECLARE_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries);
  * receivers without a spare channel for it. The transmitter adds an offset to
  * the value of the selected pair while the curtain is wanted:
  *   FIXED: curtain ON = pair value + vtx_curtain_offset (transmitter percent,
- *          VTX_RC_PERCENT_US per percent; negative shifts below the pair)
+ *          VTX_RC_PCT_TO_US(percent); negative shifts below the pair)
  *   FLOAT: curtain ON = any value above the highest pair; the pair is the one
  *          at value - (distance between the centres of the lowest and the
  *          highest pair + one percent); use exact pairs so that the lowest
@@ -127,10 +127,11 @@ PG_DECLARE_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries);
  */
 #define VTX_CURTAIN_RC_BASE           1000
 #define VTX_CURTAIN_RC_DEFAULT_OFFSET 500
-// One transmitter percent on the nominal scale (-100 = 1000, +100 = 2000 us)
-#define VTX_RC_PERCENT_US             5
+// Transmitter percent <-> us on the nominal (EdgeTX/OpenTX) scale: -100 = 988, +100 = 2012 us
+#define VTX_RC_PCT_TO_US(p)           (((p) * 512 + ((p) < 0 ? -50 : 50)) / 100)
+#define VTX_RC_US_TO_PCT(us)          (((us) * 100 + ((us) < 0 ? -256 : 256)) / 512)
 // Exact (single value) pairs also match this many us around the value
-#define VTX_RC_MAP_EXACT_SLACK        2
+#define VTX_RC_MAP_EXACT_SLACK        6
 
 typedef enum {
     VTX_CURTAIN_RC_OFF = 0,
@@ -152,9 +153,9 @@ typedef struct vtxCurtainConfig_s {
 PG_DECLARE(vtxCurtainConfig_t, vtxCurtainConfig);
 
 // Nominal scale of a synced channel: transmitter -100 / 0 / +100
-#define VTX_RC_SYNC_NOMINAL_LOW   1000
+#define VTX_RC_SYNC_NOMINAL_LOW   988
 #define VTX_RC_SYNC_NOMINAL_MID   1500
-#define VTX_RC_SYNC_NOMINAL_HIGH  2000
+#define VTX_RC_SYNC_NOMINAL_HIGH  2012
 
 // Default pairs: 20 transmitter values, -90..-9 and +9..+90 in 9 % steps (0 % is left out)
 #define VTX_RC_PRESET_PAIRS           20

@@ -178,7 +178,7 @@ bool vtxRcSyncCalibrated(void)
     return cfg->rcSync && cfg->rcSyncLow && cfg->rcSyncLow < cfg->rcSyncMid && cfg->rcSyncMid < cfg->rcSyncHigh;
 }
 
-// Received us -> nominal us (transmitter -100 = 1000, 0 = 1500, +100 = 2000),
+// Received us -> nominal us (transmitter -100 = 988, 0 = 1500, +100 = 2012),
 // so VTX map values set once keep matching after a change of RC link.
 int vtxRcSyncNormalize(int value)
 {
@@ -294,12 +294,12 @@ int16_t vtxCurtainRcOffset(uint8_t rcChannel)
 
     if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
         if (rcChannel && vtxRcMapChannelCenterSpan(rcChannel, &span)) {
-            return span + VTX_RC_PERCENT_US;
+            return span + VTX_RC_PCT_TO_US(1);
         }
         return VTX_CURTAIN_RC_DEFAULT_OFFSET;
     }
 
-    return vtxCurtainConfig()->offset * VTX_RC_PERCENT_US;
+    return VTX_RC_PCT_TO_US(vtxCurtainConfig()->offset);
 }
 
 int8_t vtxRcMapFindEntry(void)
@@ -455,7 +455,7 @@ bool vtxRcPresetApply(uint8_t grid, uint8_t rcChannel)
                 continue;
             }
             vtxRcMapEntry_t *entry = vtxRcMapEntriesMutable(slot);
-            const uint16_t value = VTX_RC_SYNC_NOMINAL_MID + vtxRcPresetPercent(slot) * VTX_RC_PERCENT_US;
+            const uint16_t value = VTX_RC_SYNC_NOMINAL_MID + VTX_RC_PCT_TO_US(vtxRcPresetPercent(slot));
             entry->rcChannel = rcChannel;
             entry->band = band;
             entry->channel = chan;
@@ -534,7 +534,7 @@ static bool vtxRcSyncPatternFound(const uint16_t *step, uint16_t *low, uint16_t 
 
 static int vtxRcSyncMarkerGrid(uint16_t value)
 {
-    const int percent = (vtxRcSyncNormalize(value) - VTX_RC_SYNC_NOMINAL_MID) / VTX_RC_PERCENT_US;
+    const int percent = VTX_RC_US_TO_PCT(vtxRcSyncNormalize(value) - VTX_RC_SYNC_NOMINAL_MID);
     const int offset = percent - VTX_RC_SYNC_MARKER_BASE;
     if (offset < -VTX_RC_SYNC_MARKER_TOL) {
         return -1;

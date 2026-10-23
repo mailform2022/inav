@@ -6304,7 +6304,7 @@ Privacy curtain on the VTX map channel, for receivers without a spare channel. O
 
 ### vtx_curtain_offset
 
-Curtain offset in transmitter percent (-100..100, 1 % = 5 us on the nominal 1000-2000 scale) that the transmitter adds to the pair value in FIXED mode; negative values put the curtain below the pair. With vtx_rc_sync calibrated it follows the RC link, so the same percent works after a change of link. With no pairs mapped the curtain is ON from 1000 + |offset|. Must be larger than the span of the pairs so shifted values do not land on another pair. FLOAT ignores it and uses the distance between the lowest and the highest pair + 1 %.
+Curtain offset in transmitter percent (-100..100, 1 % = 5.12 us on the nominal EdgeTX 988-2012 scale) that the transmitter adds to the pair value in FIXED mode; negative values put the curtain below the pair. With vtx_rc_sync calibrated it follows the RC link, so the same percent works after a change of link. With no pairs mapped the curtain is ON from 1000 + |offset|. Must be larger than the span of the pairs so shifted values do not land on another pair. FLOAT ignores it and uses the distance between the lowest and the highest pair + 1 %.
 
 | Default | Min | Max |
 | --- | --- | --- |
@@ -6384,7 +6384,7 @@ VTX whose default pairs were last loaded into the VTX map (by the sync marker fr
 
 ### vtx_rc_sync
 
-Learn how the RC link maps the transmitter's -100 / 0 / +100 on the VTX map channel (`vtx_curtain_channel`, or the channel of the first VTX map entry). While disarmed the transmitter sends a 0.6 s burst -100, +100, 0, -100, +100, 0 (100 ms per step); the received values are stored in `vtx_rc_sync_low/mid/high`. Once calibrated, VTX map and curtain values are nominal: -100 = 1000, 0 = 1500, +100 = 2000 us (value = 1500 + 5 x percent), and keep working after a change of RC link. A VTX marker step after the burst (-85 + 10 x grid index %) loads that VTX's default pairs (see `vtx_rc_preset`). ON (default) listens on the channel whenever disarmed; OFF: VTX map values are the received us, as before.
+Learn how the RC link maps the transmitter's -100 / 0 / +100 on the VTX map channel (`vtx_curtain_channel`, or the channel of the first VTX map entry). While disarmed the transmitter sends a 0.6 s burst -100, +100, 0, -100, +100, 0 (100 ms per step); the received values are stored in `vtx_rc_sync_low/mid/high`. Once calibrated, VTX map and curtain values are nominal: -100 = 988, 0 = 1500, +100 = 2012 us as EdgeTX/OpenTX send them (value = 1500 + 5.12 x percent), and keep working after a change of RC link. A VTX marker step after the burst (-85 + 10 x grid index %) loads that VTX's default pairs (see `vtx_rc_preset`). ON (default) listens on the channel whenever disarmed; OFF: VTX map values are the received us, as before.
 
 | Default | Min | Max |
 | --- | --- | --- |
