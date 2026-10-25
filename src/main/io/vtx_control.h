@@ -130,8 +130,10 @@ PG_DECLARE_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries);
 // Transmitter percent <-> us on the nominal (EdgeTX/OpenTX) scale: -100 = 988, +100 = 2012 us
 #define VTX_RC_PCT_TO_US(p)           (((p) * 512 + ((p) < 0 ? -50 : 50)) / 100)
 #define VTX_RC_US_TO_PCT(us)          (((us) * 100 + ((us) < 0 ? -256 : 256)) / 512)
-// Exact (single value) pairs also match this many us around the value
-#define VTX_RC_MAP_EXACT_SLACK        6
+// An exact (single value) pair or its FIXED curtain value matches the nearest
+// received value within half the distance to its neighbour, at most this many us
+// (2.5 %), so quantised RC links (ELRS Wide switch mode) still hit every pair
+#define VTX_RC_MAP_NEAR_MAX_US        13
 
 typedef enum {
     VTX_CURTAIN_RC_OFF = 0,
@@ -151,6 +153,19 @@ typedef struct vtxCurtainConfig_s {
 } vtxCurtainConfig_t;
 
 PG_DECLARE(vtxCurtainConfig_t, vtxCurtainConfig);
+
+// Received us for transmitter -100, -90 ... +100 % on the VTX map channel,
+// learned from the sweep after the sync burst; all 0 = use the 3-point sync
+#define VTX_RC_CURVE_POINTS           21
+#define VTX_RC_CURVE_STEP_PCT         10
+typedef struct vtxRcCurveConfig_s {
+    uint16_t point[VTX_RC_CURVE_POINTS];
+} vtxRcCurveConfig_t;
+
+PG_DECLARE(vtxRcCurveConfig_t, vtxRcCurveConfig);
+bool vtxRcCurveValid(void);
+bool vtxRcSyncInProgress(void);
+void vtxRcMapChanged(void);
 
 // Nominal scale of a synced channel: transmitter -100 / 0 / +100
 #define VTX_RC_SYNC_NOMINAL_LOW   988

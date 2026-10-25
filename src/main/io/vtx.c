@@ -136,6 +136,8 @@ static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice)
     static uint8_t commandedChannel = 0;
     static uint8_t reassertsLeft = 0;
     static timeMs_t lastSendMs = 0;
+    static uint8_t commandedGrid = VTX_3G3_GRID_COUNT;
+    static bool gridChanged = false;
 
     uint8_t vtxBand;
     uint8_t vtxChan;
@@ -151,13 +153,22 @@ static bool vtxProcessBandAndChannel(vtxDevice_t *vtxDevice)
 
     const timeMs_t nowMs = millis();
 
-    if (settledBand != commandedBand || settledChannel != commandedChannel) {
+    // The same band/channel is another frequency on another grid, and the
+    // device echoes the old pair: retune after a grid change (Configuration, RC sync)
+    const uint8_t grid = vtx3G3_EffectiveGrid();
+    if (grid != commandedGrid) {
+        gridChanged = commandedGrid != VTX_3G3_GRID_COUNT;
+        commandedGrid = grid;
+    }
+
+    if (settledBand != commandedBand || settledChannel != commandedChannel || gridChanged) {
         commandedBand = settledBand;
         commandedChannel = settledChannel;
         reassertsLeft = vtxConfig()->vtx3g3ChanReassert;
     }
 
-    if (vtxBand != settledBand || vtxChan != settledChannel) {
+    if (vtxBand != settledBand || vtxChan != settledChannel || gridChanged) {
+        gridChanged = false;
         lastSendMs = nowMs;
         vtxCommonSetBandAndChannel(vtxDevice, settledBand, settledChannel);
         return true;

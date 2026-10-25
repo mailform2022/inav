@@ -48,6 +48,16 @@ bool sensorsAutodetect(void)
 {
     bool eepromUpdatePending = false;
 
+    // Fleet diffs and raw .bin flashing leave fixed sensor types behind:
+    // always detect acc, baro and mag, without storing the result
+    accelerometerConfigMutable()->acc_hardware = ACC_AUTODETECT;
+#ifdef USE_BARO
+    barometerConfigMutable()->baro_hardware = BARO_AUTODETECT;
+#endif
+#ifdef USE_MAG
+    compassConfigMutable()->mag_hardware = MAG_AUTODETECT;
+#endif
+
     if (!gyroInit()) {
         return false;
     }
@@ -76,25 +86,6 @@ bool sensorsAutodetect(void)
 
 #ifdef USE_OPFLOW
     opflowInit();
-#endif
-
-    if (accelerometerConfig()->acc_hardware == ACC_AUTODETECT) {
-        accelerometerConfigMutable()->acc_hardware = detectedSensors[SENSOR_INDEX_ACC];
-        eepromUpdatePending = true;
-    }
-
-#ifdef USE_BARO
-    if (barometerConfig()->baro_hardware == BARO_AUTODETECT) {
-        barometerConfigMutable()->baro_hardware = detectedSensors[SENSOR_INDEX_BARO];
-        eepromUpdatePending = true;
-    }
-#endif
-
-#ifdef USE_MAG
-    if (compassConfig()->mag_hardware == MAG_AUTODETECT) {
-        compassConfigMutable()->mag_hardware = detectedSensors[SENSOR_INDEX_MAG];
-        eepromUpdatePending = true;
-    }
 #endif
 
 #ifdef USE_PITOT

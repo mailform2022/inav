@@ -2779,6 +2779,7 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
                     memset(entry, 0, sizeof(*entry));
                 }
             }
+            vtxRcMapChanged();
         }
         break;
 
@@ -4061,7 +4062,7 @@ bool mspFCProcessInOutCommand(uint16_t cmdMSP, sbuf_t *dst, sbuf_t *src, mspResu
 #endif
 
 #ifdef USE_MAG
-				if (compassConfig()->mag_hardware != MAG_NONE) {
+				if (detectedSensors[SENSOR_INDEX_MAG] != MAG_NONE) {
 					sensorsSet(SENSOR_MAG);
 					ENABLE_STATE(COMPASS_CALIBRATED);
 					DISABLE_ARMING_FLAG(ARMING_DISABLED_HARDWARE_FAILURE);

@@ -116,6 +116,7 @@ typedef struct fixedWingLaunchData_s {
     timeUs_t currentStateTimeUs;
     fixedWingLaunchState_t currentState;
     uint8_t pitchAngle; // used to smooth the transition of the pitch angle
+    int8_t rollAngle;   // nav_fw_launch_roll_angle, smoothed the same way
 } fixedWingLaunchData_t;
 
 static EXTENDED_FASTRAM fixedWingLaunchData_t fwLaunch;
@@ -271,7 +272,7 @@ static void resetPidsIfNeeded(void) {
 static void updateRcCommand(void)
 {
     // lock roll and yaw and apply needed pitch angle
-    rcCommand[ROLL] = 0;
+    rcCommand[ROLL] = pidAngleToRcCommand(DEGREES_TO_DECIDEGREES(fwLaunch.rollAngle), pidProfile()->max_angle_inclination[FD_ROLL]);
     rcCommand[PITCH] = pidAngleToRcCommand(-DEGREES_TO_DECIDEGREES(fwLaunch.pitchAngle), pidProfile()->max_angle_inclination[FD_PITCH]);
     rcCommand[YAW] = 0;
 }
@@ -288,6 +289,7 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_WAIT_THROTTLE(timeUs
         }
         else {
             fwLaunch.pitchAngle = navConfig()->fw.launch_climb_angle;
+            fwLaunch.rollAngle = navConfig()->fw.launch_roll_angle;
             return FW_LAUNCH_EVENT_GOTO_DETECTION;
         }
     }
@@ -296,6 +298,8 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_WAIT_THROTTLE(timeUs
     }
 
     fwLaunch.pitchAngle = 0;
+
+    fwLaunch.rollAngle = 0;
 
     return FW_LAUNCH_EVENT_NONE;
 }
@@ -332,6 +336,7 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_MOTOR_IDLE(timeUs_t 
     else {
         rcCommand[THROTTLE] = scaleRangef(elapsedTimeMs, 0.0f, LAUNCH_MOTOR_IDLE_SPINUP_TIME, getThrottleIdleValue(), currentBatteryProfile->nav.fw.launch_idle_throttle);
         fwLaunch.pitchAngle = scaleRangef(elapsedTimeMs, 0.0f, LAUNCH_MOTOR_IDLE_SPINUP_TIME, 0, navConfig()->fw.launch_climb_angle);
+        fwLaunch.rollAngle = scaleRangef(elapsedTimeMs, 0.0f, LAUNCH_MOTOR_IDLE_SPINUP_TIME, 0, navConfig()->fw.launch_roll_angle);
     }
 
     return FW_LAUNCH_EVENT_NONE;
@@ -420,6 +425,7 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_IN_PROGRESS(timeUs_t
         if (throttleStickIsLow()) {
             fwLaunch.currentStateTimeUs = currentTimeUs;
             fwLaunch.pitchAngle = 0;
+            fwLaunch.rollAngle = 0;
             if (isRollPitchStickDeflected(navConfig()->fw.launch_land_abort_deadband)) {
                 return FW_LAUNCH_EVENT_ABORT;
             }
@@ -428,6 +434,7 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_IN_PROGRESS(timeUs_t
                 fwLaunch.currentStateTimeUs = currentTimeUs;
             }
             fwLaunch.pitchAngle = navConfig()->fw.launch_climb_angle;
+            fwLaunch.rollAngle = navConfig()->fw.launch_roll_angle;
         }
     } else {
         initialTime = navConfig()->fw.launch_motor_timer + navConfig()->fw.launch_motor_spinup_time;
@@ -465,6 +472,7 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_FINISH(timeUs_t curr
             rcCommand[THROTTLE] = scaleRangef(elapsedTimeMs, 0.0f, endTimeMs, launchThrottle, rcCommand[THROTTLE]);
         }
         fwLaunch.pitchAngle = scaleRangef(elapsedTimeMs, 0.0f, endTimeMs, navConfig()->fw.launch_climb_angle, rcCommand[PITCH]);
+        fwLaunch.rollAngle = scaleRangef(elapsedTimeMs, 0.0f, endTimeMs, navConfig()->fw.launch_roll_angle, 0.0f);
     }
 
     return FW_LAUNCH_EVENT_NONE;

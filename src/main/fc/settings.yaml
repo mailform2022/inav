@@ -2946,6 +2946,12 @@ groups:
         field: fw.launch_climb_angle
         min: 5
         max: 45
+      - name: nav_fw_launch_roll_angle
+        description: "Bank angle (degrees) held during the launch sequence instead of wings level, positive = right wing down. Counters a constant turn right after the launch; fades out to the stick together with the climb angle during `nav_fw_launch_end_time`."
+        default_value: 0
+        field: fw.launch_roll_angle
+        min: -10
+        max: 10
       - name: nav_fw_launch_manual_throttle
         description: "Allows launch with manually controlled throttle. INAV only levels wings and controls climb pitch during launch. Throttle is controlled directly by throttle stick movement. IF USED WITHOUT A GPS LOCK plane must be launched immediately after throttle is increased to avoid issues with climb out stabilisation and the launch ending sooner than expected (launch end timer starts as soon as the throttle stick is raised)."
         default_value: OFF

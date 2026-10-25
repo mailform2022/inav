@@ -77,6 +77,15 @@ PG_REGISTER_ARRAY(vtxRcMapEntry_t, MAX_VTX_RC_MAP_ENTRIES, vtxRcMapEntries, PG_V
 PG_REGISTER(vtxCustomGridConfig_t, vtxCustomGridConfig, PG_VTX_CUSTOM_GRID, 0);
 
 PG_REGISTER_WITH_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig, PG_VTX_CURTAIN_CONFIG, 3);
+PG_REGISTER(vtxRcCurveConfig_t, vtxRcCurveConfig, PG_VTX_RC_CURVE, 0);
+
+// Bumped whenever the map, the grid or the RC scale changes: the pair is re-applied
+static uint8_t vtxRcMapGeneration = 0;
+
+void vtxRcMapChanged(void)
+{
+    vtxRcMapGeneration++;
+}
 
 PG_RESET_TEMPLATE(vtxCurtainConfig_t, vtxCurtainConfig,
       .mode = SETTING_VTX_CURTAIN_MODE_DEFAULT,
@@ -172,6 +181,17 @@ static bool vtxRcMapEntryIsValid(const vtxRcMapEntry_t *entry)
         entry->rangeEnd >= entry->rangeStart;
 }
 
+bool vtxRcCurveValid(void)
+{
+    const uint16_t *point = vtxRcCurveConfig()->point;
+    for (int i = 0; i < VTX_RC_CURVE_POINTS; i++) {
+        if (!point[i] || (i && point[i] <= point[i - 1])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool vtxRcSyncCalibrated(void)
 {
     const vtxCurtainConfig_t *cfg = vtxCurtainConfig();
@@ -184,6 +204,20 @@ int vtxRcSyncNormalize(int value)
 {
     if (!vtxRcSyncCalibrated()) {
         return value;
+    }
+
+    if (vtxRcCurveValid()) {
+        // Piecewise linear over the sweep points: removes curvature of the link
+        const uint16_t *point = vtxRcCurveConfig()->point;
+        int seg = 0;
+        while (seg < VTX_RC_CURVE_POINTS - 2 && value >= point[seg + 1]) {
+            seg++;
+        }
+        const int32_t segNominal100 = (int32_t)VTX_RC_SYNC_NOMINAL_MID * 100 + (-100 + VTX_RC_CURVE_STEP_PCT * seg) * 512;
+        const int32_t segWidth100 = VTX_RC_CURVE_STEP_PCT * 512;
+        const int32_t span = point[seg + 1] - point[seg];
+        const int32_t nominal100 = segNominal100 + ((int32_t)(value - point[seg]) * segWidth100 + (value >= point[seg] ? span / 2 : -span / 2)) / span;
+        return (nominal100 + (nominal100 >= 0 ? 50 : -50)) / 100;
     }
 
     const vtxCurtainConfig_t *cfg = vtxCurtainConfig();
@@ -248,25 +282,6 @@ static bool vtxRcMapChannelCenterSpan(uint8_t rcChannel, int *span)
     return found;
 }
 
-// rcChannel == 0 matches the pairs of every channel
-static int8_t vtxRcMapMatch(uint8_t rcChannel, int shift)
-{
-    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
-        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
-        if (!vtxRcMapEntryIsValid(entry) || (rcChannel && entry->rcChannel != rcChannel)) {
-            continue;
-        }
-
-        const int value = rcMapChannelValue(entry->rcChannel) - shift;
-        const int slack = entry->rangeStart == entry->rangeEnd ? VTX_RC_MAP_EXACT_SLACK : 0;
-        if (value >= entry->rangeStart - slack && value <= entry->rangeEnd + slack) {
-            return index;
-        }
-    }
-
-    return -1;
-}
-
 uint8_t vtxCurtainRcChannel(void)
 {
     if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_OFF) {
@@ -302,24 +317,121 @@ int16_t vtxCurtainRcOffset(uint8_t rcChannel)
     return VTX_RC_PCT_TO_US(vtxCurtainConfig()->offset);
 }
 
+static bool vtxRcMapEntryOnChannel(const vtxRcMapEntry_t *entry, uint8_t rcChannel)
+{
+    return vtxRcMapEntryIsValid(entry) && entry->rcChannel == rcChannel;
+}
+
+// Matching value of an exact pair (curtain = 0) or of its FIXED curtain (curtain = 1)
+static int vtxRcMapCandidate(const vtxRcMapEntry_t *entry, int curtain, int curtainOffset)
+{
+    return entry->rangeStart + (curtain ? curtainOffset : 0);
+}
+
+static int vtxRcMapCandidateTolerance(uint8_t rcChannel, int candidate, int curtains, int curtainOffset)
+{
+    int tolerance = VTX_RC_MAP_NEAR_MAX_US;
+
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (!vtxRcMapEntryOnChannel(entry, rcChannel) || entry->rangeStart != entry->rangeEnd) {
+            continue;
+        }
+        for (int curtain = 0; curtain < curtains; curtain++) {
+            const int gap = ABS(vtxRcMapCandidate(entry, curtain, curtainOffset) - candidate);
+            if (gap && gap / 2 < tolerance) {
+                tolerance = gap / 2;
+            }
+        }
+    }
+
+    return tolerance;
+}
+
+/*
+ * Pair selected by a (nominal) value on rcChannel. Range pairs match inclusively;
+ * exact pairs and, in FIXED mode, their curtain values (pair + offset) match the
+ * nearest one. *curtain tells that the value is a curtain value.
+ */
+static int8_t vtxRcMapLookup(uint8_t rcChannel, int value, bool *curtain)
+{
+    const bool fixedCurtain = vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FIXED && vtxCurtainRcChannel() == rcChannel;
+    const int curtainOffset = fixedCurtain ? vtxCurtainRcOffset(rcChannel) : 0;
+    const int curtains = fixedCurtain ? 2 : 1;
+
+    *curtain = false;
+
+    for (int pass = 0; pass < curtains; pass++) {
+        for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+            const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+            if (!vtxRcMapEntryOnChannel(entry, rcChannel) || entry->rangeStart == entry->rangeEnd) {
+                continue;
+            }
+            const int shifted = value - (pass ? curtainOffset : 0);
+            if (shifted >= entry->rangeStart && shifted <= entry->rangeEnd) {
+                *curtain = pass;
+                return index;
+            }
+        }
+    }
+
+    int8_t best = -1;
+    int bestDistance = 0;
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (!vtxRcMapEntryOnChannel(entry, rcChannel) || entry->rangeStart != entry->rangeEnd) {
+            continue;
+        }
+        for (int pass = 0; pass < curtains; pass++) {
+            const int candidate = vtxRcMapCandidate(entry, pass, curtainOffset);
+            const int distance = ABS(value - candidate);
+            if ((best >= 0 && distance >= bestDistance) ||
+                distance > vtxRcMapCandidateTolerance(rcChannel, candidate, curtains, curtainOffset)) {
+                continue;
+            }
+            best = index;
+            bestDistance = distance;
+            *curtain = pass;
+        }
+    }
+
+    return best;
+}
+
 int8_t vtxRcMapFindEntry(void)
 {
-    int8_t index = vtxRcMapMatch(0, 0);
-    if (index >= 0) {
-        return index;
+    for (uint8_t index = 0; index < MAX_VTX_RC_MAP_ENTRIES; index++) {
+        const vtxRcMapEntry_t *entry = vtxRcMapEntries(index);
+        if (!vtxRcMapEntryIsValid(entry)) {
+            continue;
+        }
+        bool seen = false;
+        for (uint8_t prev = 0; prev < index && !seen; prev++) {
+            seen = vtxRcMapEntryOnChannel(vtxRcMapEntries(prev), entry->rcChannel);
+        }
+        if (seen) {
+            continue;
+        }
+        bool curtain;
+        const int8_t found = vtxRcMapLookup(entry->rcChannel, rcMapChannelValue(entry->rcChannel), &curtain);
+        if (found >= 0) {
+            return found;
+        }
     }
 
     const uint8_t rcChannel = vtxCurtainRcChannel();
-    if (rcChannel) {
-        index = vtxRcMapMatch(rcChannel, vtxCurtainRcOffset(rcChannel));
+    if (rcChannel && vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
+        bool curtain;
+        return vtxRcMapLookup(rcChannel, rcMapChannelValue(rcChannel) - vtxCurtainRcOffset(rcChannel), &curtain);
     }
 
-    return index;
+    return -1;
 }
 
 bool vtxRcCurtainActive(void)
 {
-    // Between ranges (a switch in travel, an unmapped value) the curtain holds
+    // Between pairs (a switch in travel, an unmapped value) and during the
+    // sync burst the curtain holds
     static bool active = false;
 
     const uint8_t rcChannel = vtxCurtainRcChannel();
@@ -327,21 +439,21 @@ bool vtxRcCurtainActive(void)
         active = false;
         return false;
     }
+    if (vtxRcSyncInProgress()) {
+        return active;
+    }
 
     const int value = rcMapChannelValue(rcChannel);
     const int offset = vtxCurtainRcOffset(rcChannel);
     uint16_t low = 0;
     uint16_t high = 0;
+    bool curtain = false;
 
     if (!vtxRcMapChannelSpan(rcChannel, &low, &high)) {
         active = value >= VTX_CURTAIN_RC_BASE + ABS(offset) / 2;
-    } else if (vtxRcMapMatch(rcChannel, 0) >= 0) {
-        active = false;
-    } else if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT) {
-        if (value > high) {
-            active = true;
-        }
-    } else if (vtxRcMapMatch(rcChannel, offset) >= 0) {
+    } else if (vtxRcMapLookup(rcChannel, value, &curtain) >= 0) {
+        active = curtain;
+    } else if (vtxCurtainConfig()->mode == VTX_CURTAIN_RC_FLOAT && value > high) {
         active = true;
     }
 
@@ -351,6 +463,15 @@ bool vtxRcCurtainActive(void)
 void vtxUpdateRcMap(void)
 {
     static int8_t appliedEntry = -1;
+    static uint8_t appliedGeneration = 0;
+
+    if (vtxRcSyncInProgress()) {
+        return;
+    }
+    if (appliedGeneration != vtxRcMapGeneration) {
+        appliedGeneration = vtxRcMapGeneration;
+        appliedEntry = -1;
+    }
 
     const int8_t index = vtxRcMapFindEntry();
     if (index < 0 || index == appliedEntry) {
@@ -474,27 +595,51 @@ bool vtxRcPresetApply(uint8_t grid, uint8_t rcChannel)
     cfg->rcChannel = rcChannel;
     cfg->offset = VTX_RC_PRESET_CURTAIN_OFFSET;
     cfg->preset = grid;
+    vtxRcMapGeneration++;
     return true;
 }
 
 /*
  * Sync burst sent by the transmitter on the VTX map channel while disarmed:
- * -100, +100, 0, -100, +100, 0, each held for 100 ms, optionally followed by a
- * VTX marker step (-85 + 10 x grid %) and a return to 0. The marker makes the
- * FC load the default pairs of that grid; without it only the scale is learned.
- * Every step is shorter than the VTX band/channel settle window, so the VTX is
- * never retuned by the burst.
+ * header -100, +100, 0, -100, +100, 0 (each step 40..600 ms, 100-300 ms
+ * recommended), then an optional VTX marker step (-85 + 10 x grid %), a 0 step
+ * and an optional sweep -100, -90 ... +100 % (21 steps). The header teaches the
+ * 3-point scale, the marker loads the default pairs of that grid, the sweep
+ * teaches the transfer curve of the link (curvature, quantisation). A burst
+ * without the sweep falls back to the 3-point scale. Nothing is written to the
+ * EEPROM and the VTX is not retuned until the burst is over.
  */
 #define VTX_RC_SYNC_STEPS            6
 #define VTX_RC_SYNC_STEP_MIN_MS      40
-#define VTX_RC_SYNC_STEP_MAX_MS      250
+#define VTX_RC_SYNC_STEP_MAX_MS      600
 #define VTX_RC_SYNC_FLAT_US          12
 #define VTX_RC_SYNC_REPEAT_US        15
 #define VTX_RC_SYNC_MIN_SPAN_US      400
-#define VTX_RC_SYNC_MARKER_WAIT_MS   400
+#define VTX_RC_SYNC_PHASE_WAIT_MS    (VTX_RC_SYNC_STEP_MAX_MS + 400)
 #define VTX_RC_SYNC_MARKER_BASE      -85
 #define VTX_RC_SYNC_MARKER_STEP      10
 #define VTX_RC_SYNC_MARKER_TOL       3
+#define VTX_RC_SYNC_SWEEP_END_US     40
+#define VTX_RC_SYNC_SWEEP_RISE_US    20
+
+typedef enum {
+    VTX_RC_SYNC_IDLE = 0,
+    VTX_RC_SYNC_MARKER,
+    VTX_RC_SYNC_SWEEP,
+} vtxRcSyncState_e;
+
+static vtxRcSyncState_e syncState = VTX_RC_SYNC_IDLE;
+static timeMs_t syncPhaseSinceMs;
+static bool syncChanged;
+static int syncMarkerGrid;
+static uint16_t syncMarkerRaw;      // received marker step, decoded once the scale is final
+static uint16_t syncSweep[VTX_RC_CURVE_POINTS];
+static uint8_t syncSweepCount;
+
+bool vtxRcSyncInProgress(void)
+{
+    return syncState != VTX_RC_SYNC_IDLE;
+}
 
 static uint8_t vtxRcSyncChannel(void)
 {
@@ -532,9 +677,11 @@ static bool vtxRcSyncPatternFound(const uint16_t *step, uint16_t *low, uint16_t 
     return *mid > *low + span * 3 / 10 && *mid < *low + span * 7 / 10;
 }
 
+// Decoded on the new curve when the burst had a sweep, else on the 3-point scale
 static int vtxRcSyncMarkerGrid(uint16_t value)
 {
-    const int percent = VTX_RC_US_TO_PCT(vtxRcSyncNormalize(value) - VTX_RC_SYNC_NOMINAL_MID);
+    const int delta = vtxRcSyncNormalize(value) - VTX_RC_SYNC_NOMINAL_MID;
+    const int percent = (delta * 100 + (delta < 0 ? -256 : 256)) / 512;
     const int offset = percent - VTX_RC_SYNC_MARKER_BASE;
     if (offset < -VTX_RC_SYNC_MARKER_TOL) {
         return -1;
@@ -557,21 +704,74 @@ static bool vtxRcMapIsEmpty(void)
     return true;
 }
 
-static void vtxRcSyncFinish(bool calibrationChanged, int markerGrid, uint8_t rcChannel)
+static void vtxRcSyncMarker(int markerGrid, uint8_t rcChannel)
 {
-    bool changed = calibrationChanged;
+    syncMarkerGrid = markerGrid;
+    // The grid chosen in Configuration may differ from the last marker:
+    // the transmitter profile always wins
+    if (markerGrid >= 0 && (markerGrid != vtxCurtainConfig()->preset ||
+                            markerGrid != vtxConfig()->vtx3g3Grid || vtxRcMapIsEmpty())) {
+        syncChanged |= vtxRcPresetApply(markerGrid, rcChannel);
+    }
+}
 
-    if (markerGrid >= 0 && (markerGrid != vtxCurtainConfig()->preset || vtxRcMapIsEmpty())) {
-        changed |= vtxRcPresetApply(markerGrid, rcChannel);
+static void vtxRcSyncFinish(bool sweepComplete, uint8_t rcChannel)
+{
+    vtxRcCurveConfig_t *curve = vtxRcCurveConfigMutable();
+    if (sweepComplete) {
+        syncChanged |= memcmp(curve->point, syncSweep, sizeof(syncSweep)) != 0;
+        memcpy(curve->point, syncSweep, sizeof(syncSweep));
+    } else if (vtxRcCurveValid()) {
+        // A curve learned on another link must not distort the new 3-point scale
+        memset(curve, 0, sizeof(*curve));
+        syncChanged = true;
+    }
+    if (syncMarkerRaw) {
+        vtxRcSyncMarker(vtxRcSyncMarkerGrid(syncMarkerRaw), rcChannel);
     }
 
-    if (changed) {
+    syncState = VTX_RC_SYNC_IDLE;
+    vtxRcMapGeneration++;
+
+    if (syncChanged) {
         saveConfigAndNotify();
     } else {
         beeper(BEEPER_ACTION_SUCCESS);
     }
-    LOG_INFO(VTX, "RC sync on CH%u: %u/%u/%u us, VTX %d", rcChannel,
-        vtxCurtainConfig()->rcSyncLow, vtxCurtainConfig()->rcSyncMid, vtxCurtainConfig()->rcSyncHigh, markerGrid);
+    LOG_INFO(VTX, "RC sync on CH%u: %u/%u/%u us, VTX %d, curve %u", rcChannel,
+        vtxCurtainConfig()->rcSyncLow, vtxCurtainConfig()->rcSyncMid, vtxCurtainConfig()->rcSyncHigh,
+        syncMarkerGrid, vtxRcCurveValid());
+}
+
+static bool vtxRcSyncNear(uint16_t value, uint16_t reference)
+{
+    return ABS((int)value - (int)reference) <= VTX_RC_SYNC_SWEEP_END_US;
+}
+
+static void vtxRcSyncSweepStep(uint16_t held, uint8_t rcChannel, timeMs_t nowMs)
+{
+    const vtxCurtainConfig_t *cfg = vtxCurtainConfig();
+
+    if (syncSweepCount == 0) {
+        if (vtxRcSyncNear(held, cfg->rcSyncMid)) {
+            syncPhaseSinceMs = nowMs;   // 0 step between the marker and the sweep
+            return;
+        }
+        if (!vtxRcSyncNear(held, cfg->rcSyncLow)) {
+            vtxRcSyncFinish(false, rcChannel);
+            return;
+        }
+    } else if (held < syncSweep[syncSweepCount - 1] + VTX_RC_SYNC_SWEEP_RISE_US) {
+        vtxRcSyncFinish(false, rcChannel);
+        return;
+    }
+
+    syncSweep[syncSweepCount++] = held;
+    syncPhaseSinceMs = nowMs;
+    if (syncSweepCount == VTX_RC_CURVE_POINTS) {
+        vtxRcSyncFinish(vtxRcSyncNear(held, cfg->rcSyncHigh) &&
+                        vtxRcSyncNear(syncSweep[VTX_RC_CURVE_POINTS / 2], cfg->rcSyncMid), rcChannel);
+    }
 }
 
 void vtxRcSyncUpdate(void)
@@ -582,49 +782,107 @@ void vtxRcSyncUpdate(void)
     static uint32_t flatSum = 0;
     static uint16_t flatSamples = 0;
     static timeMs_t flatSinceMs = 0;
-    static bool markerPending = false;
-    static bool markerCalibrationChanged = false;
-    static timeMs_t markerSinceMs = 0;
 
     const uint8_t rcChannel = vtxRcSyncChannel();
     if (!vtxCurtainConfig()->rcSync || !rcChannel || ARMING_FLAG(ARMED)) {
+        if (syncState != VTX_RC_SYNC_IDLE) {
+            // Interrupted burst: drop what was learned in RAM
+            syncState = VTX_RC_SYNC_IDLE;
+            readEEPROM();
+            vtxRcMapGeneration++;
+        }
         stepCount = 0;
         flatRef = -1;
-        markerPending = false;
         return;
     }
 
     const int value = rxGetChannelValue(rcChannel - 1);
     const timeMs_t nowMs = millis();
 
-    if (markerPending && nowMs - markerSinceMs > VTX_RC_SYNC_MARKER_WAIT_MS) {
-        markerPending = false;
-        vtxRcSyncFinish(markerCalibrationChanged, -1, rcChannel);
+    if (syncState == VTX_RC_SYNC_MARKER && nowMs - syncPhaseSinceMs > VTX_RC_SYNC_PHASE_WAIT_MS) {
+        syncState = VTX_RC_SYNC_SWEEP;
+        syncPhaseSinceMs = nowMs;
+    }
+    if (syncState == VTX_RC_SYNC_SWEEP && nowMs - syncPhaseSinceMs > VTX_RC_SYNC_PHASE_WAIT_MS) {
+        // The transmitter may stay on +100 after the last sweep step
+        if (syncSweepCount == VTX_RC_CURVE_POINTS - 1 && flatRef >= 0 && flatSamples &&
+            nowMs - flatSinceMs >= VTX_RC_SYNC_STEP_MIN_MS) {
+            vtxRcSyncSweepStep((flatSum + flatSamples / 2) / flatSamples, rcChannel, nowMs);
+        }
+        if (syncState == VTX_RC_SYNC_SWEEP) {
+            vtxRcSyncFinish(false, rcChannel);
+        }
+        stepCount = 0;
     }
 
     if (flatRef >= 0 && ABS(value - flatRef) <= VTX_RC_SYNC_FLAT_US) {
         flatSum += value;
         flatSamples++;
+        // Resolve a phase on a step that is still held, so a burst without a
+        // sweep (or a marker) is saved as soon as the transmitter is back on a pair
+        const timeMs_t heldMs = nowMs - flatSinceMs;
+        const uint16_t held = (flatSum + flatSamples / 2) / flatSamples;
+        if (syncState == VTX_RC_SYNC_MARKER && heldMs > VTX_RC_SYNC_STEP_MAX_MS) {
+            syncState = VTX_RC_SYNC_SWEEP;
+            syncPhaseSinceMs = nowMs;
+        }
+        if (syncState == VTX_RC_SYNC_SWEEP && heldMs >= VTX_RC_SYNC_STEP_MIN_MS) {
+            const bool sweepValue = syncSweepCount ? held >= syncSweep[syncSweepCount - 1] + VTX_RC_SYNC_SWEEP_RISE_US
+                                                   : vtxRcSyncNear(held, vtxCurtainConfig()->rcSyncLow) ||
+                                                     vtxRcSyncNear(held, vtxCurtainConfig()->rcSyncMid);
+            if (heldMs > VTX_RC_SYNC_STEP_MAX_MS && syncSweepCount == VTX_RC_CURVE_POINTS - 1 && sweepValue) {
+                vtxRcSyncSweepStep(held, rcChannel, nowMs);   // stays on +100 after the sweep
+            } else if (!sweepValue || heldMs > VTX_RC_SYNC_STEP_MAX_MS) {
+                vtxRcSyncFinish(false, rcChannel);
+            }
+            if (syncState == VTX_RC_SYNC_IDLE) {
+                stepCount = 0;
+                flatRef = -1;
+            }
+        }
         return;
     }
 
     if (flatRef >= 0) {
         const timeMs_t heldMs = nowMs - flatSinceMs;
         const uint16_t held = (flatSum + flatSamples / 2) / flatSamples;
-        if (markerPending && heldMs >= VTX_RC_SYNC_STEP_MIN_MS) {
-            markerPending = false;
-            const int grid = heldMs <= VTX_RC_SYNC_STEP_MAX_MS ? vtxRcSyncMarkerGrid(held) : -1;
-            vtxRcSyncFinish(markerCalibrationChanged, grid, rcChannel);
-        } else if (heldMs > VTX_RC_SYNC_STEP_MAX_MS) {
-            stepCount = 0;
-        } else if (heldMs >= VTX_RC_SYNC_STEP_MIN_MS) {
-            if (stepCount == VTX_RC_SYNC_STEPS) {
-                memmove(&step[0], &step[1], sizeof(step[0]) * (VTX_RC_SYNC_STEPS - 1));
-                stepCount--;
+        // A step shorter than the minimum is a frame caught in transit between two steps
+        if (heldMs >= VTX_RC_SYNC_STEP_MIN_MS) {
+            const bool tooLong = heldMs > VTX_RC_SYNC_STEP_MAX_MS;
+            switch (syncState) {
+            case VTX_RC_SYNC_IDLE:
+                if (tooLong) {
+                    stepCount = 0;
+                } else {
+                    if (stepCount == VTX_RC_SYNC_STEPS) {
+                        memmove(&step[0], &step[1], sizeof(step[0]) * (VTX_RC_SYNC_STEPS - 1));
+                        stepCount--;
+                    }
+                    step[stepCount++] = held;
+                }
+                break;
+            case VTX_RC_SYNC_MARKER:
+                syncState = VTX_RC_SYNC_SWEEP;
+                syncPhaseSinceMs = nowMs;
+                if (tooLong) {
+                    break;
+                }
+                if (vtxRcSyncNear(held, vtxCurtainConfig()->rcSyncLow)) {
+                    // No marker: the first sweep step follows the header directly
+                    vtxRcSyncSweepStep(held, rcChannel, nowMs);
+                } else if (ABS((int)held - (int)vtxCurtainConfig()->rcSyncMid) > VTX_RC_SYNC_FLAT_US) {
+                    syncMarkerRaw = held;
+                }
+                break;
+            case VTX_RC_SYNC_SWEEP:
+                if (tooLong) {
+                    vtxRcSyncFinish(false, rcChannel);
+                } else {
+                    vtxRcSyncSweepStep(held, rcChannel, nowMs);
+                }
+                break;
             }
-            step[stepCount++] = held;
         }
-        // A shorter step is a frame caught in transit between two steps
     }
 
     flatRef = value;
@@ -633,14 +891,17 @@ void vtxRcSyncUpdate(void)
     flatSinceMs = nowMs;
 
     uint16_t low, mid, high;
-    if (!markerPending && stepCount == VTX_RC_SYNC_STEPS && vtxRcSyncPatternFound(step, &low, &mid, &high)) {
+    if (syncState == VTX_RC_SYNC_IDLE && stepCount == VTX_RC_SYNC_STEPS && vtxRcSyncPatternFound(step, &low, &mid, &high)) {
         stepCount = 0;
         vtxCurtainConfig_t *cfg = vtxCurtainConfigMutable();
-        markerCalibrationChanged = cfg->rcSyncLow != low || cfg->rcSyncMid != mid || cfg->rcSyncHigh != high;
+        syncChanged = cfg->rcSyncLow != low || cfg->rcSyncMid != mid || cfg->rcSyncHigh != high;
         cfg->rcSyncLow = low;
         cfg->rcSyncMid = mid;
         cfg->rcSyncHigh = high;
-        markerPending = true;
-        markerSinceMs = nowMs;
+        syncMarkerGrid = -1;
+        syncMarkerRaw = 0;
+        syncSweepCount = 0;
+        syncState = VTX_RC_SYNC_MARKER;
+        syncPhaseSinceMs = nowMs;
     }
 }

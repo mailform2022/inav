@@ -4366,6 +4366,13 @@ static void cliStatus(char *cmdline)
                 configuredGrid < ARRAYLEN(gridNames) ? gridNames[configuredGrid] : "?",
                 detect < ARRAYLEN(detectNames) ? detectNames[detect] : "?",
                 report->freqMin, report->freqMax, report->powerMax);
+        {
+            const uint16_t *point = vtxRcCurveConfig()->point;
+            cliPrintLinef("VTX RC sync: CH%u %u/%u/%u us curve=%s [%u %u %u %u %u]",
+                    vtxCurtainConfig()->rcChannel, vtxCurtainConfig()->rcSyncLow, vtxCurtainConfig()->rcSyncMid,
+                    vtxCurtainConfig()->rcSyncHigh, vtxRcCurveValid() ? "21pt" : "3pt",
+                    point[0], point[5], point[10], point[15], point[20]);
+        }
 
 #if defined(USE_VTX_TRAMP)
         // Whole Tramp frames verbatim. The SX33 and the TX3339 both answer the

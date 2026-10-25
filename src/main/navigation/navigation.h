@@ -379,6 +379,7 @@ typedef struct navConfig_s {
         uint8_t  wp_tracking_accuracy;       // fixed wing tracking accuracy response factor
         uint8_t  wp_tracking_max_angle;      // fixed wing tracking accuracy max alignment angle [degs]
         uint8_t  wp_turn_smoothing;          // WP mission turn smoothing options
+        int8_t   launch_roll_angle;          // Bank angle held during launch, positive = right wing down (deg)
     } fw;
 } navConfig_t;
 
