@@ -3142,6 +3142,16 @@ Delay between detected launch and launch sequence start and throttling up (ms)
 
 ---
 
+### nav_fw_launch_roll_angle
+
+Bank angle (degrees) held during the launch sequence instead of wings level, positive = right wing down. Counters a constant turn right after the launch; fades out to the stick together with the climb angle during `nav_fw_launch_end_time`.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | -10 | 10 |
+
+---
+
 ### nav_fw_launch_spinup_time
 
 Time to bring power from minimum throttle to nav_fw_launch_thr - to avoid big stress on ESC and large torque from propeller
