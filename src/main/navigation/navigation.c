@@ -230,6 +230,10 @@ PG_RESET_TEMPLATE(navConfig_t, navConfig,
         .launch_max_altitude = SETTING_NAV_FW_LAUNCH_MAX_ALTITUDE_DEFAULT,      // cm, altitude where to consider launch ended
         .launch_climb_angle = SETTING_NAV_FW_LAUNCH_CLIMB_ANGLE_DEFAULT,        // 18 degrees
         .launch_roll_angle = SETTING_NAV_FW_LAUNCH_ROLL_ANGLE_DEFAULT,          // degrees
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+        .launch_heading_hold = SETTING_NAV_FW_LAUNCH_HEADING_HOLD_DEFAULT,
+        .launch_heading_max_roll = SETTING_NAV_FW_LAUNCH_HEADING_MAX_ROLL_DEFAULT,
+#endif
         .launch_max_angle = SETTING_NAV_FW_LAUNCH_MAX_ANGLE_DEFAULT,            // 45 deg
         .launch_manual_throttle = SETTING_NAV_FW_LAUNCH_MANUAL_THROTTLE_DEFAULT,// OFF
         .launch_land_abort_deadband = SETTING_NAV_FW_LAUNCH_LAND_ABORT_DEADBAND_DEFAULT,  // 100 us

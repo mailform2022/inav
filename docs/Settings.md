@@ -3062,6 +3062,26 @@ Time for the transition of throttle and pitch angle, between the launch state an
 
 ---
 
+### nav_fw_launch_heading_hold
+
+Hold the heading the model had when the launch was detected: during the launch the heading error is corrected with bank (1 degree of bank per degree of heading error, up to `nav_fw_launch_heading_max_roll`), added to `nav_fw_launch_roll_angle`. Fades out with the climb angle during `nav_fw_launch_end_time`. Moving the sticks ends the launch and the correction as usual.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| ON | OFF | ON |
+
+---
+
+### nav_fw_launch_heading_max_roll
+
+Largest bank angle (degrees) `nav_fw_launch_heading_hold` may command.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 15 | 1 | 30 |
+
+---
+
 ### nav_fw_launch_idle_motor_delay
 
 Delay between raising throttle and motor starting at idle throttle (ms)

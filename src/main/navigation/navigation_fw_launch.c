@@ -52,6 +52,8 @@
 
 #define SWING_LAUNCH_MIN_ROTATION_RATE      DEGREES_TO_RADIANS(100)     // expect minimum 100dps rotation rate
 #define LAUNCH_MOTOR_IDLE_SPINUP_TIME 1500                              // ms
+#define LAUNCH_HEADING_ROLL_GAIN 1.0f                                   // deg of bank per deg of heading error
+#define LAUNCH_HEADING_MAX_STEP 50                                      // decidegrees per PID cycle
 #if !defined(UNUSED)
 #define UNUSED(x) ((void)(x))
 #endif
@@ -117,6 +119,11 @@ typedef struct fixedWingLaunchData_s {
     fixedWingLaunchState_t currentState;
     uint8_t pitchAngle; // used to smooth the transition of the pitch angle
     int8_t rollAngle;   // nav_fw_launch_roll_angle, smoothed the same way
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    float headingScale;     // 0 before the launch is detected, fades out with the climb angle
+    int16_t headingTarget;  // decidegrees
+    int16_t headingLast;    // decidegrees
+#endif
 } fixedWingLaunchData_t;
 
 static EXTENDED_FASTRAM fixedWingLaunchData_t fwLaunch;
@@ -269,10 +276,50 @@ static void resetPidsIfNeeded(void) {
     }
 }
 
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+static int16_t launchHeadingWrap(int32_t decidegrees)
+{
+    while (decidegrees > 1800) {
+        decidegrees -= 3600;
+    }
+    while (decidegrees < -1800) {
+        decidegrees += 3600;
+    }
+    return decidegrees;
+}
+
+static float launchHeadingRoll(void)
+{
+    const int16_t heading = attitude.values.yaw;
+    const int16_t step = launchHeadingWrap(heading - fwLaunch.headingLast);
+    fwLaunch.headingLast = heading;
+
+    if (fwLaunch.headingScale <= 0.0f) {
+        fwLaunch.headingTarget = heading;
+        return 0.0f;
+    }
+    // A step no airframe can turn in one PID cycle is the IMU snapping to the GPS course
+    if (ABS(step) > LAUNCH_HEADING_MAX_STEP) {
+        fwLaunch.headingTarget = launchHeadingWrap(fwLaunch.headingTarget + step);
+    }
+    if (!navConfig()->fw.launch_heading_hold) {
+        return 0.0f;
+    }
+
+    const float maxRoll = navConfig()->fw.launch_heading_max_roll;
+    const float error = DECIDEGREES_TO_DEGREES((float)launchHeadingWrap(fwLaunch.headingTarget - heading));
+    return fwLaunch.headingScale * constrainf(error * LAUNCH_HEADING_ROLL_GAIN, -maxRoll, maxRoll);
+}
+#endif
+
 static void updateRcCommand(void)
 {
     // lock roll and yaw and apply needed pitch angle
-    rcCommand[ROLL] = pidAngleToRcCommand(DEGREES_TO_DECIDEGREES(fwLaunch.rollAngle), pidProfile()->max_angle_inclination[FD_ROLL]);
+    float rollAngle = fwLaunch.rollAngle;
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    rollAngle += launchHeadingRoll();
+#endif
+    rcCommand[ROLL] = pidAngleToRcCommand(DEGREES_TO_DECIDEGREES(rollAngle), pidProfile()->max_angle_inclination[FD_ROLL]);
     rcCommand[PITCH] = pidAngleToRcCommand(-DEGREES_TO_DECIDEGREES(fwLaunch.pitchAngle), pidProfile()->max_angle_inclination[FD_PITCH]);
     rcCommand[YAW] = 0;
 }
@@ -281,6 +328,9 @@ static void updateRcCommand(void)
 
 static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_WAIT_THROTTLE(timeUs_t currentTimeUs)
 {
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    fwLaunch.headingScale = 0.0f;
+#endif
     UNUSED(currentTimeUs);
 
     if (!throttleStickIsLow()) {
@@ -344,6 +394,9 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_MOTOR_IDLE(timeUs_t 
 
 static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_WAIT_DETECTION(timeUs_t currentTimeUs)
 {
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    fwLaunch.headingScale = 0.0f;   // follow the heading until the throw
+#endif
     if (throttleStickIsLow()) {
         return FW_LAUNCH_EVENT_THROTTLE_LOW; // go back to FW_LAUNCH_STATE_WAIT_THROTTLE
     }
@@ -371,6 +424,9 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_WAIT_DETECTION(timeU
 
 static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_DETECTED(timeUs_t currentTimeUs)
 {
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    fwLaunch.headingScale = 1.0f;
+#endif
     UNUSED(currentTimeUs);
 
     // waiting for the navigation to move it to next step FW_LAUNCH_STATE_MOTOR_DELAY
@@ -426,6 +482,9 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_IN_PROGRESS(timeUs_t
             fwLaunch.currentStateTimeUs = currentTimeUs;
             fwLaunch.pitchAngle = 0;
             fwLaunch.rollAngle = 0;
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+            fwLaunch.headingScale = 0.0f;
+#endif
             if (isRollPitchStickDeflected(navConfig()->fw.launch_land_abort_deadband)) {
                 return FW_LAUNCH_EVENT_ABORT;
             }
@@ -435,6 +494,9 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_IN_PROGRESS(timeUs_t
             }
             fwLaunch.pitchAngle = navConfig()->fw.launch_climb_angle;
             fwLaunch.rollAngle = navConfig()->fw.launch_roll_angle;
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+            fwLaunch.headingScale = 1.0f;
+#endif
         }
     } else {
         initialTime = navConfig()->fw.launch_motor_timer + navConfig()->fw.launch_motor_spinup_time;
@@ -473,6 +535,9 @@ static fixedWingLaunchEvent_t fwLaunchState_FW_LAUNCH_STATE_FINISH(timeUs_t curr
         }
         fwLaunch.pitchAngle = scaleRangef(elapsedTimeMs, 0.0f, endTimeMs, navConfig()->fw.launch_climb_angle, rcCommand[PITCH]);
         fwLaunch.rollAngle = scaleRangef(elapsedTimeMs, 0.0f, endTimeMs, navConfig()->fw.launch_roll_angle, 0.0f);
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+        fwLaunch.headingScale = scaleRangef(elapsedTimeMs, 0.0f, endTimeMs, 1.0f, 0.0f);
+#endif
     }
 
     return FW_LAUNCH_EVENT_NONE;
@@ -525,6 +590,11 @@ void applyFixedWingLaunchController(timeUs_t currentTimeUs)
 
 void resetFixedWingLaunchController(timeUs_t currentTimeUs)
 {
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    fwLaunch.headingScale = 0.0f;
+    fwLaunch.headingTarget = attitude.values.yaw;
+    fwLaunch.headingLast = attitude.values.yaw;
+#endif
     if (navConfig()->fw.launch_manual_throttle) {
         // no detection or motor control required with manual launch throttle
         // so start at launch in progress

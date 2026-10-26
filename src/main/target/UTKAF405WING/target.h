@@ -18,6 +18,7 @@
 #pragma once
 
 #define TARGET_BOARD_IDENTIFIER "SP4W"
+#define USE_FW_LAUNCH_HEADING_HOLD
 #define USBD_PRODUCT_STRING  "Utka F405 Wing"
 
 // LEDs
