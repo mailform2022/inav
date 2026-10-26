@@ -165,6 +165,7 @@ typedef struct vtxRcCurveConfig_s {
 PG_DECLARE(vtxRcCurveConfig_t, vtxRcCurveConfig);
 bool vtxRcCurveValid(void);
 bool vtxRcSyncInProgress(void);
+bool vtxRcSyncHold(void);
 void vtxRcMapChanged(void);
 
 // Nominal scale of a synced channel: transmitter -100 / 0 / +100

@@ -439,7 +439,7 @@ bool vtxRcCurtainActive(void)
         active = false;
         return false;
     }
-    if (vtxRcSyncInProgress()) {
+    if (vtxRcSyncHold()) {
         return active;
     }
 
@@ -465,7 +465,7 @@ void vtxUpdateRcMap(void)
     static int8_t appliedEntry = -1;
     static uint8_t appliedGeneration = 0;
 
-    if (vtxRcSyncInProgress()) {
+    if (vtxRcSyncHold()) {
         return;
     }
     if (appliedGeneration != vtxRcMapGeneration) {
@@ -635,10 +635,19 @@ static int syncMarkerGrid;
 static uint16_t syncMarkerRaw;      // received marker step, decoded once the scale is final
 static uint16_t syncSweep[VTX_RC_CURVE_POINTS];
 static uint8_t syncSweepCount;
+static uint16_t syncPrevLow, syncPrevMid, syncPrevHigh;   // restored when a burst is interrupted
+static bool syncHold;
 
 bool vtxRcSyncInProgress(void)
 {
     return syncState != VTX_RC_SYNC_IDLE;
+}
+
+// From the first -100 step of a burst until the channel rests: the VTX keeps
+// its pair and the curtain its state, even if the burst is never recognised
+bool vtxRcSyncHold(void)
+{
+    return syncHold || syncState != VTX_RC_SYNC_IDLE;
 }
 
 static uint8_t vtxRcSyncChannel(void)
@@ -786,11 +795,15 @@ void vtxRcSyncUpdate(void)
     const uint8_t rcChannel = vtxRcSyncChannel();
     if (!vtxCurtainConfig()->rcSync || !rcChannel || ARMING_FLAG(ARMED)) {
         if (syncState != VTX_RC_SYNC_IDLE) {
-            // Interrupted burst: drop what was learned in RAM
+            // Interrupted burst: drop the scale learned in RAM, the map is untouched
+            vtxCurtainConfig_t *cfg = vtxCurtainConfigMutable();
+            cfg->rcSyncLow = syncPrevLow;
+            cfg->rcSyncMid = syncPrevMid;
+            cfg->rcSyncHigh = syncPrevHigh;
             syncState = VTX_RC_SYNC_IDLE;
-            readEEPROM();
             vtxRcMapGeneration++;
         }
+        syncHold = false;
         stepCount = 0;
         flatRef = -1;
         return;
@@ -798,6 +811,28 @@ void vtxRcSyncUpdate(void)
 
     const int value = rxGetChannelValue(rcChannel - 1);
     const timeMs_t nowMs = millis();
+
+    {
+        static int holdRef;
+        static timeMs_t holdSinceMs;
+        const vtxCurtainConfig_t *cfg = vtxCurtainConfig();
+        bool curtain;
+        if (!syncHold && syncState == VTX_RC_SYNC_IDLE &&
+            vtxRcSyncNear(value, cfg->rcSyncLow) &&
+            vtxRcMapLookup(rcChannel, rcMapChannelValue(rcChannel), &curtain) < 0) {
+            syncHold = true;
+            holdRef = value;
+            holdSinceMs = nowMs;
+        }
+        if (syncHold) {
+            if (ABS(value - holdRef) > VTX_RC_SYNC_FLAT_US) {
+                holdRef = value;
+                holdSinceMs = nowMs;
+            } else if (syncState == VTX_RC_SYNC_IDLE && nowMs - holdSinceMs > VTX_RC_SYNC_PHASE_WAIT_MS) {
+                syncHold = false;
+            }
+        }
+    }
 
     if (syncState == VTX_RC_SYNC_MARKER && nowMs - syncPhaseSinceMs > VTX_RC_SYNC_PHASE_WAIT_MS) {
         syncState = VTX_RC_SYNC_SWEEP;
@@ -894,6 +929,9 @@ void vtxRcSyncUpdate(void)
     if (syncState == VTX_RC_SYNC_IDLE && stepCount == VTX_RC_SYNC_STEPS && vtxRcSyncPatternFound(step, &low, &mid, &high)) {
         stepCount = 0;
         vtxCurtainConfig_t *cfg = vtxCurtainConfigMutable();
+        syncPrevLow = cfg->rcSyncLow;
+        syncPrevMid = cfg->rcSyncMid;
+        syncPrevHigh = cfg->rcSyncHigh;
         syncChanged = cfg->rcSyncLow != low || cfg->rcSyncMid != mid || cfg->rcSyncHigh != high;
         cfg->rcSyncLow = low;
         cfg->rcSyncMid = mid;
