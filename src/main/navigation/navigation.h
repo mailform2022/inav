@@ -383,6 +383,7 @@ typedef struct navConfig_s {
 #ifdef USE_FW_LAUNCH_HEADING_HOLD
         bool     launch_heading_hold;        // Hold the heading of the throw with bank during launch
         uint8_t  launch_heading_max_roll;    // Bank limit of the launch heading hold (deg)
+        uint16_t launch_heading_time;        // Heading hold after a throw flown in ANGLE without NAV LAUNCH (ms)
 #endif
     } fw;
 } navConfig_t;

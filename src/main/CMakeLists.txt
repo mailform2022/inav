@@ -556,6 +556,8 @@ main_sources(COMMON_SRC
     navigation/navigation.h
     navigation/navigation_fixedwing.c
     navigation/navigation_fw_launch.c
+    navigation/fw_takeoff_heading.c
+    navigation/fw_takeoff_heading.h
     navigation/navigation_geo.c
     navigation/navigation_multicopter.c
     navigation/navigation_pos_estimator.c

@@ -233,6 +233,7 @@ PG_RESET_TEMPLATE(navConfig_t, navConfig,
 #ifdef USE_FW_LAUNCH_HEADING_HOLD
         .launch_heading_hold = SETTING_NAV_FW_LAUNCH_HEADING_HOLD_DEFAULT,
         .launch_heading_max_roll = SETTING_NAV_FW_LAUNCH_HEADING_MAX_ROLL_DEFAULT,
+        .launch_heading_time = SETTING_NAV_FW_LAUNCH_HEADING_TIME_DEFAULT,
 #endif
         .launch_max_angle = SETTING_NAV_FW_LAUNCH_MAX_ANGLE_DEFAULT,            // 45 deg
         .launch_manual_throttle = SETTING_NAV_FW_LAUNCH_MANUAL_THROTTLE_DEFAULT,// OFF

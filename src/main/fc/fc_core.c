@@ -74,6 +74,7 @@
 #include "msp/msp_serial.h"
 
 #include "navigation/navigation.h"
+#include "navigation/fw_takeoff_heading.h"
 
 #include "rx/rx.h"
 #include "rx/msp.h"
@@ -938,6 +939,9 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
 
     updatePositionEstimator();
     applyWaypointNavigationAndAltitudeHold();
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    fwTakeoffHeadingApply(currentTimeUs);
+#endif
 
     // Apply throttle tilt compensation
     applyThrottleTiltCompensation();

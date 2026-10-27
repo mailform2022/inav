@@ -2953,7 +2953,7 @@ groups:
         min: -10
         max: 10
       - name: nav_fw_launch_heading_hold
-        description: "Hold the heading the model had when the launch was detected: during the launch the heading error is corrected with bank (1 degree of bank per degree of heading error, up to `nav_fw_launch_heading_max_roll`), added to `nav_fw_launch_roll_angle`. Fades out with the climb angle during `nav_fw_launch_end_time`. Moving the sticks ends the launch and the correction as usual."
+        description: "Hold the heading the model had when the throw was detected, correcting the heading error with bank (1 degree of bank per degree of heading error, up to `nav_fw_launch_heading_max_roll`). In NAV LAUNCH it is added to `nav_fw_launch_roll_angle` and fades out with the climb angle. Without NAV LAUNCH it works in ANGLE (also NAV ALTHOLD) with the throttle raised: a throw is detected like in NAV LAUNCH (`nav_fw_launch_accel`, `nav_fw_launch_detect_time`, `nav_fw_launch_max_angle`), the correction is added to the roll stick for `nav_fw_launch_heading_time` and fades to 0 over the last 40 %. Only once per arm; the roll stick beyond `nav_fw_launch_land_abort_deadband` ends it, pitch and throttle do not."
         default_value: ON
         field: fw.launch_heading_hold
         type: bool
@@ -2965,6 +2965,13 @@ groups:
         condition: USE_FW_LAUNCH_HEADING_HOLD
         min: 1
         max: 30
+      - name: nav_fw_launch_heading_time
+        description: "How long (ms) `nav_fw_launch_heading_hold` holds the heading after a throw flown without NAV LAUNCH."
+        default_value: 5000
+        field: fw.launch_heading_time
+        condition: USE_FW_LAUNCH_HEADING_HOLD
+        min: 1000
+        max: 15000
       - name: nav_fw_launch_manual_throttle
         description: "Allows launch with manually controlled throttle. INAV only levels wings and controls climb pitch during launch. Throttle is controlled directly by throttle stick movement. IF USED WITHOUT A GPS LOCK plane must be launched immediately after throttle is increased to avoid issues with climb out stabilisation and the launch ending sooner than expected (launch end timer starts as soon as the throttle stick is raised)."
         default_value: OFF

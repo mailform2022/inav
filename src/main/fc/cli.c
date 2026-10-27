@@ -107,6 +107,7 @@ bool cliMode = false;
 #include "fc/fc_msp_box.h"
 
 #include "navigation/navigation.h"
+#include "navigation/fw_takeoff_heading.h"
 #include "navigation/navigation_private.h"
 
 #include "rx/rx.h"
@@ -4109,6 +4110,13 @@ static void cliStatus(char *cmdline)
         compilerVersion
     );
     cliPrintLinef("System Uptime: %d seconds", millis() / 1000);
+#ifdef USE_FW_LAUNCH_HEADING_HOLD
+    {
+        const fwTakeoffHeading_t *th = fwTakeoffHeadingStatus();
+        cliPrintLinef("Takeoff heading: state %u throws %u roll-stick aborts %u last max error %s%u.%u deg",
+            th->state, th->detected, th->aborted, th->maxError < 0 ? "-" : "", ABS(th->maxError) / 10, ABS(th->maxError) % 10);
+    }
+#endif
     rtcGetDateTime(&dt);
     dateTimeFormatLocal(buf, &dt);
     cliPrintLinef("Current Time: %s", buf);

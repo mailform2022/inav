@@ -3064,7 +3064,7 @@ Time for the transition of throttle and pitch angle, between the launch state an
 
 ### nav_fw_launch_heading_hold
 
-Hold the heading the model had when the launch was detected: during the launch the heading error is corrected with bank (1 degree of bank per degree of heading error, up to `nav_fw_launch_heading_max_roll`), added to `nav_fw_launch_roll_angle`. Fades out with the climb angle during `nav_fw_launch_end_time`. Moving the sticks ends the launch and the correction as usual.
+Hold the heading the model had when the throw was detected, correcting the heading error with bank (1 degree of bank per degree of heading error, up to `nav_fw_launch_heading_max_roll`). In NAV LAUNCH it is added to `nav_fw_launch_roll_angle` and fades out with the climb angle. Without NAV LAUNCH it works in ANGLE (also NAV ALTHOLD) with the throttle raised: a throw is detected like in NAV LAUNCH (`nav_fw_launch_accel`, `nav_fw_launch_detect_time`, `nav_fw_launch_max_angle`), the correction is added to the roll stick for `nav_fw_launch_heading_time` and fades to 0 over the last 40 %. Only once per arm; the roll stick beyond `nav_fw_launch_land_abort_deadband` ends it, pitch and throttle do not.
 
 | Default | Min | Max |
 | --- | --- | --- |
@@ -3079,6 +3079,16 @@ Largest bank angle (degrees) `nav_fw_launch_heading_hold` may command.
 | Default | Min | Max |
 | --- | --- | --- |
 | 15 | 1 | 30 |
+
+---
+
+### nav_fw_launch_heading_time
+
+How long (ms) `nav_fw_launch_heading_hold` holds the heading after a throw flown without NAV LAUNCH.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 5000 | 1000 | 15000 |
 
 ---
 
