@@ -6404,7 +6404,7 @@ VTX RF power level to use. The exact number of mw depends on the VTX hardware.
 
 ### vtx_rc_preset
 
-VTX whose default pairs were last loaded into the VTX map (by the sync marker from the transmitter or `vtxmap preset`). A sync marker for the same VTX keeps hand edits of the map; a different VTX reloads its 20 default pairs. NONE = the map was made by hand
+VTX whose default pairs were last loaded into the VTX map (by the sync marker from the transmitter, `vtxmap preset`, or automatically). While disarmed the map follows the VTX in use: when the effective grid (detected with `vtx_3g3_grid = AUTO`, chosen in Configuration or by the sync marker) differs from this preset, or the map is empty, its default pairs are loaded and saved once. A sync marker for the same VTX keeps hand edits of the map; a different VTX reloads its default pairs. NONE = the map was made by hand and is only refilled when empty
 
 | Default | Min | Max |
 | --- | --- | --- |

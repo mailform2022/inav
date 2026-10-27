@@ -460,6 +460,8 @@ bool vtxRcCurtainActive(void)
     return active;
 }
 
+static void vtxRcMapFollowGrid(void);
+
 void vtxUpdateRcMap(void)
 {
     static int8_t appliedEntry = -1;
@@ -468,6 +470,7 @@ void vtxUpdateRcMap(void)
     if (vtxRcSyncHold()) {
         return;
     }
+    vtxRcMapFollowGrid();
     if (appliedGeneration != vtxRcMapGeneration) {
         appliedGeneration = vtxRcMapGeneration;
         appliedEntry = -1;
@@ -565,7 +568,10 @@ bool vtxRcPresetApply(uint8_t grid, uint8_t rcChannel)
         return false;
     }
 
-    vtxConfigMutable()->vtx3g3Grid = grid;
+    // An AUTO grid that already detected this VTX stays AUTO, so a VTX swap keeps being followed
+    if (vtxConfig()->vtx3g3Grid != VTX_3G3_GRID_AUTO || vtx3G3_EffectiveGrid() != grid) {
+        vtxConfigMutable()->vtx3g3Grid = grid;
+    }
     vtxSettingsConfigMutable()->frequencyGroup = FREQUENCYGROUP_3G3;
     vtxSettingsConfigMutable()->power = powers;
 
@@ -637,6 +643,12 @@ static uint16_t syncSweep[VTX_RC_CURVE_POINTS];
 static uint8_t syncSweepCount;
 static uint16_t syncPrevLow, syncPrevMid, syncPrevHigh;   // restored when a burst is interrupted
 static bool syncHold;
+static vtxRcSyncStats_t syncStats;
+
+const vtxRcSyncStats_t *vtxRcSyncStats(void)
+{
+    return &syncStats;
+}
 
 bool vtxRcSyncInProgress(void)
 {
@@ -713,13 +725,49 @@ static bool vtxRcMapIsEmpty(void)
     return true;
 }
 
+/*
+ * The map follows the VTX in use: when the effective grid (detected, chosen in
+ * Configuration or by the transmitter marker) is not the one the map was filled
+ * for, or the map is empty, its default pairs are loaded and saved once, while
+ * disarmed. A hand-made map (vtx_rc_preset = NONE) is left alone.
+ */
+static void vtxRcMapFollowGrid(void)
+{
+    static uint8_t followedGrid = VTX_3G3_GRID_COUNT;
+
+    if (ARMING_FLAG(ARMED) || vtxSettingsConfig()->frequencyGroup != FREQUENCYGROUP_3G3 ||
+        vtx3G3_DetectSource() == VTX_3G3_DETECT_NONE) {
+        return;
+    }
+    const uint8_t grid = vtx3G3_EffectiveGrid();
+    const uint8_t preset = vtxCurtainConfig()->preset;
+    const bool empty = vtxRcMapIsEmpty();
+    if (grid == followedGrid || (!empty && (preset == VTX_RC_PRESET_NONE || preset == grid))) {
+        followedGrid = grid;
+        return;
+    }
+    followedGrid = grid;
+    uint8_t rcChannel = vtxRcSyncChannel();
+    if (!rcChannel) {
+        if (!vtxCurtainConfig()->rcSync) {
+            return;
+        }
+        rcChannel = VTX_RC_PRESET_DEFAULT_CHANNEL;
+    }
+    if (vtxRcPresetApply(grid, rcChannel)) {
+        syncStats.followed++;
+        LOG_INFO(VTX, "VTX map follows grid %u on CH%u", grid, rcChannel);
+        saveConfigAndNotify();
+    }
+}
+
 static void vtxRcSyncMarker(int markerGrid, uint8_t rcChannel)
 {
     syncMarkerGrid = markerGrid;
     // The grid chosen in Configuration may differ from the last marker:
     // the transmitter profile always wins
     if (markerGrid >= 0 && (markerGrid != vtxCurtainConfig()->preset ||
-                            markerGrid != vtxConfig()->vtx3g3Grid || vtxRcMapIsEmpty())) {
+                            markerGrid != vtx3G3_EffectiveGrid() || vtxRcMapIsEmpty())) {
         syncChanged |= vtxRcPresetApply(markerGrid, rcChannel);
     }
 }
@@ -741,6 +789,9 @@ static void vtxRcSyncFinish(bool sweepComplete, uint8_t rcChannel)
 
     syncState = VTX_RC_SYNC_IDLE;
     vtxRcMapGeneration++;
+    syncStats.completed++;
+    syncStats.lastSweep = sweepComplete ? syncSweepCount : 0;
+    syncStats.lastMarker = syncMarkerGrid;
 
     if (syncChanged) {
         saveConfigAndNotify();
@@ -817,9 +868,15 @@ void vtxRcSyncUpdate(void)
         static timeMs_t holdSinceMs;
         const vtxCurtainConfig_t *cfg = vtxCurtainConfig();
         bool curtain;
+        // -100 starts every burst: near the stored -100, or below the lowest pair
+        // when the link (and its scale) changed since the last sync
+        uint16_t spanLow = 0, spanHigh = 0;
+        const int mapped = rcMapChannelValue(rcChannel);
+        const bool belowPairs = vtxRcMapChannelSpan(rcChannel, &spanLow, &spanHigh) &&
+                                mapped < (int)spanLow - VTX_RC_SYNC_FLAT_US;
         if (!syncHold && syncState == VTX_RC_SYNC_IDLE &&
-            vtxRcSyncNear(value, cfg->rcSyncLow) &&
-            vtxRcMapLookup(rcChannel, rcMapChannelValue(rcChannel), &curtain) < 0) {
+            (vtxRcSyncNear(value, cfg->rcSyncLow) || belowPairs) &&
+            vtxRcMapLookup(rcChannel, mapped, &curtain) < 0) {
             syncHold = true;
             holdRef = value;
             holdSinceMs = nowMs;
@@ -894,6 +951,7 @@ void vtxRcSyncUpdate(void)
                         stepCount--;
                     }
                     step[stepCount++] = held;
+                    syncStats.step[syncStats.stepIndex++ % VTX_RC_SYNC_STATS_STEPS] = held;
                 }
                 break;
             case VTX_RC_SYNC_MARKER:
@@ -941,5 +999,6 @@ void vtxRcSyncUpdate(void)
         syncSweepCount = 0;
         syncState = VTX_RC_SYNC_MARKER;
         syncPhaseSinceMs = nowMs;
+        syncStats.detected++;
     }
 }

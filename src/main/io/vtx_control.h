@@ -168,6 +168,18 @@ bool vtxRcSyncInProgress(void);
 bool vtxRcSyncHold(void);
 void vtxRcMapChanged(void);
 
+#define VTX_RC_SYNC_STATS_STEPS 8
+typedef struct vtxRcSyncStats_s {
+    uint16_t detected;     // bursts whose header was recognised
+    uint16_t completed;    // bursts finished (saved)
+    uint16_t followed;     // map reloads because the VTX grid changed
+    uint8_t  lastSweep;    // sweep points of the last burst, 0 = no sweep
+    int8_t   lastMarker;   // grid of the last marker, -1 = none
+    uint8_t  stepIndex;
+    uint16_t step[VTX_RC_SYNC_STATS_STEPS];   // last held steps seen while idle (us)
+} vtxRcSyncStats_t;
+const vtxRcSyncStats_t *vtxRcSyncStats(void);
+
 // Nominal scale of a synced channel: transmitter -100 / 0 / +100
 #define VTX_RC_SYNC_NOMINAL_LOW   988
 #define VTX_RC_SYNC_NOMINAL_MID   1500

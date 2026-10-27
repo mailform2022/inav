@@ -2238,6 +2238,16 @@ static void cliVtxMap(char *cmdline)
             curtainChannel,
             curtainChannel ? rxGetChannelValue(curtainChannel - 1) : 0,
             curtainChannel ? vtxCurtainRcOffset(curtainChannel) : 0);
+        const vtxRcSyncStats_t *st = vtxRcSyncStats();
+        cliPrintLinef("# vtxsync detected %u completed %u followed %u sweep %u marker %d preset %u grid %u scale %u/%u/%u",
+            st->detected, st->completed, st->followed, st->lastSweep, st->completed ? st->lastMarker : -1,
+            vtxCurtainConfig()->preset, vtx3G3_EffectiveGrid(),
+            vtxCurtainConfig()->rcSyncLow, vtxCurtainConfig()->rcSyncMid, vtxCurtainConfig()->rcSyncHigh);
+        cliPrintf("# vtxsync steps");
+        for (int i = 0; i < VTX_RC_SYNC_STATS_STEPS; i++) {
+            cliPrintf(" %u", st->step[(st->stepIndex + i) % VTX_RC_SYNC_STATS_STEPS]);
+        }
+        cliPrintLinefeed();
         return;
     }
 
