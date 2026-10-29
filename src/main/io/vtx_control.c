@@ -731,9 +731,35 @@ static bool vtxRcMapIsEmpty(void)
  * for, or the map is empty, its default pairs are loaded and saved once, while
  * disarmed. A hand-made map (vtx_rc_preset = NONE) is left alone.
  */
+/*
+ * A map fits a grid when every pair exists in it (no zero cells, no band or
+ * channel outside it) and no pair repeats on the same RC channel.
+ */
+static bool vtxRcMapFitsGrid(uint8_t grid)
+{
+    for (uint8_t i = 0; i < MAX_VTX_RC_MAP_ENTRIES; i++) {
+        const vtxRcMapEntry_t *a = vtxRcMapEntries(i);
+        if (!vtxRcMapEntryIsValid(a)) {
+            continue;
+        }
+        if (!vtx3G3_GridFrequency(grid, a->band, a->channel)) {
+            return false;
+        }
+        for (uint8_t j = i + 1; j < MAX_VTX_RC_MAP_ENTRIES; j++) {
+            const vtxRcMapEntry_t *b = vtxRcMapEntries(j);
+            if (vtxRcMapEntryIsValid(b) && b->rcChannel == a->rcChannel &&
+                b->band == a->band && b->channel == a->channel) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 static void vtxRcMapFollowGrid(void)
 {
     static uint8_t followedGrid = VTX_3G3_GRID_COUNT;
+    static uint8_t checkedGeneration = 0xFF;
 
     if (ARMING_FLAG(ARMED) || vtxSettingsConfig()->frequencyGroup != FREQUENCYGROUP_3G3 ||
         vtx3G3_DetectSource() == VTX_3G3_DETECT_NONE) {
@@ -742,11 +768,19 @@ static void vtxRcMapFollowGrid(void)
     const uint8_t grid = vtx3G3_EffectiveGrid();
     const uint8_t preset = vtxCurtainConfig()->preset;
     const bool empty = vtxRcMapIsEmpty();
-    if (grid == followedGrid || (!empty && (preset == VTX_RC_PRESET_NONE || preset == grid))) {
+    // A map saved for another VTX (or with pairs this grid lacks) is rebuilt
+    // even when the preset name already matches
+    bool fits = true;
+    if (!empty && checkedGeneration != vtxRcMapGeneration) {
+        checkedGeneration = vtxRcMapGeneration;
+        fits = vtxRcMapFitsGrid(grid);
+    }
+    if (fits && (grid == followedGrid || (!empty && (preset == VTX_RC_PRESET_NONE || preset == grid)))) {
         followedGrid = grid;
         return;
     }
     followedGrid = grid;
+    checkedGeneration = vtxRcMapGeneration + 1;
     uint8_t rcChannel = vtxRcSyncChannel();
     if (!rcChannel) {
         if (!vtxCurtainConfig()->rcSync) {
