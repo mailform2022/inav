@@ -3008,7 +3008,7 @@ static bool osdDrawSingleElement(uint8_t item)
 
     case OSD_VERSION:
         {
-            tfp_sprintf(buff, "INAV %s", FC_VERSION_STRING);
+            tfp_sprintf(buff, "INAV %s %s", FC_VERSION_STRING, MOD_VERSION);
             displayWrite(osdDisplayPort, elemPosX, elemPosY, buff);
             break;
         }
@@ -4210,7 +4210,7 @@ static void osdCompleteAsyncInitialization(void)
     }
 
     char string_buffer[30];
-    tfp_sprintf(string_buffer, "INAV VERSION: %s", FC_VERSION_STRING);
+    tfp_sprintf(string_buffer, "INAV VERSION: %s %s", FC_VERSION_STRING, MOD_VERSION);
     uint8_t xPos = (osdDisplayPort->cols - 19) / 2; // Automatically centre, regardless of resolution. In the case of odd number screens, bias to the left.
     displayWrite(osdDisplayPort, xPos, y++, string_buffer);
 #ifdef USE_CMS
@@ -4668,7 +4668,7 @@ static void osdShowHDArmScreen(void)
         armScreenRow++;
     }
 
-    tfp_sprintf(versionBuf, "INAV VERSION: %s", FC_VERSION_STRING);
+    tfp_sprintf(versionBuf, "INAV VERSION: %s %s", FC_VERSION_STRING, MOD_VERSION);
     displayWrite(osdDisplayPort, (osdDisplayPort->cols - strlen(versionBuf)) / 2, armScreenRow++, versionBuf);
     armScreenRow++;
 
@@ -4753,7 +4753,7 @@ static void osdShowSDArmScreen(void)
         armScreenRow++;
     }
 
-    tfp_sprintf(versionBuf, "INAV VERSION: %s", FC_VERSION_STRING);
+    tfp_sprintf(versionBuf, "INAV VERSION: %s %s", FC_VERSION_STRING, MOD_VERSION);
     displayWrite(osdDisplayPort, (osdDisplayPort->cols - strlen(versionBuf)) / 2, armScreenRow++, versionBuf);
     armScreenRow++;
 

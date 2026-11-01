@@ -34,6 +34,8 @@
 #include "io/serial.h"
 #include "io/piniobox.h"
 #include "flight/servos.h"
+#include "flight/mixer.h"
+#include "drivers/pwm_mapping.h"
 
 #define MOLNIYA_USER4_AUX_INDEX 5   // AUX6 == CH10
 #define DUCK_S7_SERVO_INDEX 5       // pad S7 (PB10): 5th servo output after the two motors
@@ -58,4 +60,9 @@ void targetConfiguration(void)
     servoParamsMutable(DUCK_S7_SERVO_INDEX)->max = 2000;
     servoParamsMutable(DUCK_S7_SERVO_INDEX)->middle = 1500;
     servoParamsMutable(DUCK_S7_SERVO_INDEX)->rate = 100;
+
+#ifdef UTKA3F405WING
+    // Utka-3 ESCs run DSHOT150 (factory INAV 8.0.1 setup)
+    motorConfigMutable()->motorPwmProtocol = PWM_TYPE_DSHOT150;
+#endif
 }

@@ -4098,10 +4098,11 @@ static void cliStatus(char *cmdline)
     char buf[MAX(FORMATTED_DATE_TIME_BUFSIZE, SETTING_MAX_NAME_LENGTH)];
     dateTime_t dt;
 
-    cliPrintLinef("%s/%s %s %s / %s (%s)",
+    cliPrintLinef("%s/%s %s %s %s / %s (%s)",
         FC_FIRMWARE_NAME,
         targetName,
         FC_VERSION_STRING,
+        MOD_VERSION,
         buildDate,
         buildTime,
         shortGitRevision
@@ -4471,10 +4472,11 @@ static void cliVersion(char *cmdline)
 {
     UNUSED(cmdline);
 
-    cliPrintLinef("# %s/%s %s %s / %s (%s)",
+    cliPrintLinef("# %s/%s %s %s %s / %s (%s)",
         FC_FIRMWARE_NAME,
         targetName,
         FC_VERSION_STRING,
+        MOD_VERSION,
         buildDate,
         buildTime,
         shortGitRevision

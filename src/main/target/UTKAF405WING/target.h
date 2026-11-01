@@ -19,7 +19,11 @@
 
 #define TARGET_BOARD_IDENTIFIER "SP4W"
 #define USE_FW_LAUNCH_HEADING_HOLD
+#ifdef UTKA3F405WING
+#define USBD_PRODUCT_STRING  "Utka-3 F405 Wing"
+#else
 #define USBD_PRODUCT_STRING  "Utka F405 Wing"
+#endif
 
 // LEDs
 #define LED0                    PA14  //Blue

@@ -19,6 +19,8 @@
 #define STR(x) STR_HELPER(x)
 #define FC_VERSION_STRING STR(FC_VERSION_MAJOR) "." STR(FC_VERSION_MINOR) "." STR(FC_VERSION_PATCH_LEVEL)
 #define FC_FIRMWARE_NAME "INAV"
+// Short release number of the Duck/Molniya build, shared with the configurator
+#define MOD_VERSION "R18"
 
 #define MW_VERSION              231
 

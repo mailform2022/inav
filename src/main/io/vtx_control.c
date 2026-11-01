@@ -624,7 +624,7 @@ bool vtxRcPresetApply(uint8_t grid, uint8_t rcChannel)
 #define VTX_RC_SYNC_PHASE_WAIT_MS    (VTX_RC_SYNC_STEP_MAX_MS + 400)
 #define VTX_RC_SYNC_MARKER_BASE      -85
 #define VTX_RC_SYNC_MARKER_STEP      10
-#define VTX_RC_SYNC_MARKER_TOL       3
+#define VTX_RC_SYNC_MARKER_TOL       4
 #define VTX_RC_SYNC_SWEEP_END_US     40
 #define VTX_RC_SYNC_SWEEP_RISE_US    20
 
