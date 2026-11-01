@@ -19,6 +19,10 @@
 
 #define TARGET_BOARD_IDENTIFIER "SP4W"
 #define USE_FW_LAUNCH_HEADING_HOLD
+#ifndef UTKA3F405WING
+// ESC protocol AUTO: DSHOT600 only if both ESCs run on it, else STANDARD
+#define USE_ESC_AUTO
+#endif
 #ifdef UTKA3F405WING
 #define USBD_PRODUCT_STRING  "Utka-3 F405 Wing"
 #else

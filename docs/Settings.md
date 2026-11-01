@@ -902,6 +902,36 @@ Q factor for dynamic notches
 
 ---
 
+### esc_auto_min_current
+
+ESC protocol AUTO test: current rise over the disarmed current [cA] that proves a motor runs on DSHOT600
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 100 | 10 | 3000 |
+
+---
+
+### esc_auto_result
+
+Outcome of the ESC protocol AUTO test: UNKNOWN (test at the next arm), DSHOT600 (all motors ran on DSHOT600), STANDARD (a motor did not run or no current sensor). Set UNKNOWN to repeat the test
+
+| Default | Min | Max |
+| --- | --- | --- |
+| UNKNOWN |  |  |
+
+---
+
+### esc_auto_test_throttle
+
+ESC protocol AUTO test: throttle (% of the idle..max range) that each motor gets alone for 1.5 s after the first arm
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 20 | 5 | 50 |
+
+---
+
 ### esc_sensor_listen_only
 
 Enable when BLHeli32 Auto Telemetry function is used. Disable in every other case
@@ -2744,7 +2774,7 @@ The number of motor poles. Required to compute motor RPM
 
 ### motor_pwm_protocol
 
-Protocol that is used to send motor updates to ESCs. Possible values - STANDARD, ONESHOT125, ONESHOT42, MULTISHOT, DSHOT150, DSHOT300, DSHOT600, DSHOT1200, BRUSHED
+Protocol that is used to send motor updates to ESCs. Possible values - STANDARD, ONESHOT125, ONESHOT42, MULTISHOT, DSHOT150, DSHOT300, DSHOT600, DSHOT1200, BRUSHED, AUTO. AUTO (Duck): DSHOT600 until the test at the first arm finds a motor that does not run on it, then STANDARD (see `esc_auto_result`)
 
 | Default | Min | Max |
 | --- | --- | --- |

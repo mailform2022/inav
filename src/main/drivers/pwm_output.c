@@ -529,7 +529,7 @@ void pwmRequestMotorTelemetry(int motorIndex)
 void pwmMotorPreconfigure(void)
 {
     // Keep track of initial motor protocol
-    initMotorProtocol = motorConfig()->motorPwmProtocol;
+    initMotorProtocol = motorPwmProtocolResolve(motorConfig()->motorPwmProtocol);
 
 #ifdef BRUSHED_MOTORS
     initMotorProtocol = PWM_TYPE_BRUSHED;   // Override proto

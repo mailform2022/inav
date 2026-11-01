@@ -84,6 +84,7 @@
 #include "telemetry/telemetry.h"
 
 #include "flight/mixer_profile.h"
+#include "flight/esc_auto.h"
 #include "flight/mixer.h"
 #include "flight/servos.h"
 #include "flight/pid.h"
@@ -954,6 +955,9 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
     pidController(dT);
 
     mixTable();
+#ifdef USE_ESC_AUTO
+    escAutoUpdate();
+#endif
 
     if (isMixerUsingServos()) {
         servoMixer(dT);

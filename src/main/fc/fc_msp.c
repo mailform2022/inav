@@ -2330,7 +2330,14 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
             sbufReadU8(src);    // gyroConfig()->gyroSyncDenominator
             sbufReadU8(src);    // BF: masterConfig.pid_process_denom
             sbufReadU8(src);    // BF: motorConfig()->useUnsyncedPwm
-            motorConfigMutable()->motorPwmProtocol = sbufReadU8(src);
+            {
+                const uint8_t protocol = sbufReadU8(src);
+                // Choosing AUTO again repeats the ESC test at the next arm
+                if (protocol == PWM_TYPE_AUTO && motorConfig()->motorPwmProtocol != PWM_TYPE_AUTO) {
+                    motorConfigMutable()->escAutoResult = ESC_AUTO_RESULT_UNKNOWN;
+                }
+                motorConfigMutable()->motorPwmProtocol = protocol;
+            }
             motorConfigMutable()->motorPwmRate = sbufReadU16(src);
             servoConfigMutable()->servoPwmRate = sbufReadU16(src);
             sbufReadU8(src);    //Was gyroSync

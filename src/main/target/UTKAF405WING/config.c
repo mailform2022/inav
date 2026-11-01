@@ -61,6 +61,11 @@ void targetConfiguration(void)
     servoParamsMutable(DUCK_S7_SERVO_INDEX)->middle = 1500;
     servoParamsMutable(DUCK_S7_SERVO_INDEX)->rate = 100;
 
+#ifdef USE_ESC_AUTO
+    // Duck: silver-motor ESCs run DSHOT600, black-motor ESCs only STANDARD PWM
+    motorConfigMutable()->motorPwmProtocol = PWM_TYPE_AUTO;
+    motorConfigMutable()->maxthrottle = 2000;
+#endif
 #ifdef UTKA3F405WING
     // Utka-3 ESCs run DSHOT150 (factory INAV 8.0.1 setup)
     motorConfigMutable()->motorPwmProtocol = PWM_TYPE_DSHOT150;

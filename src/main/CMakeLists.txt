@@ -321,6 +321,8 @@ main_sources(COMMON_SRC
     flight/rate_dynamics.c
     flight/rate_dynamics.h
     flight/mixer.c
+    flight/esc_auto.c
+    flight/esc_auto.h
     flight/mixer.h
     flight/pid.c
     flight/pid.h

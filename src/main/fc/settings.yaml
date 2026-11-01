@@ -29,7 +29,9 @@ tables:
   - name: blackbox_device
     values: ["SERIAL", "SPIFLASH", "SDCARD"]
   - name: motor_pwm_protocol
-    values: ["STANDARD", "ONESHOT125", "MULTISHOT", "BRUSHED", "DSHOT150", "DSHOT300", "DSHOT600"]
+    values: ["STANDARD", "ONESHOT125", "MULTISHOT", "BRUSHED", "DSHOT150", "DSHOT300", "DSHOT600", "AUTO"]
+  - name: esc_auto_result
+    values: ["UNKNOWN", "DSHOT600", "STANDARD"]
   - name: servo_protocol
     values: ["PWM", "SBUS", "SBUS_PWM"]
   - name: failsafe_procedure
@@ -796,10 +798,27 @@ groups:
         min: 50
         max: 32000
       - name: motor_pwm_protocol
-        description: "Protocol that is used to send motor updates to ESCs. Possible values - STANDARD, ONESHOT125, ONESHOT42, MULTISHOT, DSHOT150, DSHOT300, DSHOT600, DSHOT1200, BRUSHED"
+        description: "Protocol that is used to send motor updates to ESCs. Possible values - STANDARD, ONESHOT125, ONESHOT42, MULTISHOT, DSHOT150, DSHOT300, DSHOT600, DSHOT1200, BRUSHED, AUTO. AUTO (Duck): DSHOT600 until the test at the first arm finds a motor that does not run on it, then STANDARD (see `esc_auto_result`)"
         default_value: "ONESHOT125"
         field: motorPwmProtocol
         table: motor_pwm_protocol
+      - name: esc_auto_result
+        description: "Outcome of the ESC protocol AUTO test: UNKNOWN (test at the next arm), DSHOT600 (all motors ran on DSHOT600), STANDARD (a motor did not run or no current sensor). Set UNKNOWN to repeat the test"
+        default_value: "UNKNOWN"
+        field: escAutoResult
+        table: esc_auto_result
+      - name: esc_auto_test_throttle
+        description: "ESC protocol AUTO test: throttle (% of the idle..max range) that each motor gets alone for 1.5 s after the first arm"
+        default_value: 20
+        field: escAutoTestThrottle
+        min: 5
+        max: 50
+      - name: esc_auto_min_current
+        description: "ESC protocol AUTO test: current rise over the disarmed current [cA] that proves a motor runs on DSHOT600"
+        default_value: 100
+        field: escAutoMinCurrent
+        min: 10
+        max: 3000
       - name: motor_poles
         field: motorPoleCount
         description: "The number of motor poles. Required to compute motor RPM"

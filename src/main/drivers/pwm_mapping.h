@@ -45,6 +45,7 @@ typedef enum {
     PWM_TYPE_DSHOT150,
     PWM_TYPE_DSHOT300,
     PWM_TYPE_DSHOT600,
+    PWM_TYPE_AUTO,          // resolved to DSHOT600 or STANDARD, see motorPwmProtocolResolve()
 } motorPwmProtocolTypes_e;
 
 typedef enum {
@@ -74,5 +75,6 @@ typedef struct {
 
 bool pwmMotorAndServoInit(void);
 const motorProtocolProperties_t * getMotorProtocolProperties(motorPwmProtocolTypes_e proto);
+motorPwmProtocolTypes_e motorPwmProtocolResolve(uint8_t configured);
 pwmInitError_e getPwmInitError(void);
 const char * getPwmInitErrorMessage(void);

@@ -39,6 +39,8 @@
 #include "drivers/serial.h"
 #include "drivers/serial_uart.h"
 
+#include "flight/mixer.h"
+
 #include "sensors/rangefinder.h"
 
 #include "io/serial.h"
@@ -89,7 +91,21 @@ const char * getPwmInitErrorMessage(void)
 
 const motorProtocolProperties_t * getMotorProtocolProperties(motorPwmProtocolTypes_e proto)
 {
-    return &motorProtocolProperties[proto];
+    return &motorProtocolProperties[motorPwmProtocolResolve(proto)];
+}
+
+// AUTO: DSHOT600 until the ESC test after arming (flight/esc_auto.c) finds an ESC
+// that does not run on it. Targets without the test only use DSHOT600 once it is confirmed.
+motorPwmProtocolTypes_e motorPwmProtocolResolve(uint8_t configured)
+{
+    if (configured != PWM_TYPE_AUTO) {
+        return configured;
+    }
+#ifdef USE_ESC_AUTO
+    return motorConfig()->escAutoResult == ESC_AUTO_RESULT_STANDARD ? PWM_TYPE_STANDARD : PWM_TYPE_DSHOT600;
+#else
+    return motorConfig()->escAutoResult == ESC_AUTO_RESULT_DSHOT600 ? PWM_TYPE_DSHOT600 : PWM_TYPE_STANDARD;
+#endif
 }
 
 static bool checkPwmTimerConflicts(const timerHardware_t *timHw)

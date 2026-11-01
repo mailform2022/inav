@@ -87,7 +87,16 @@ typedef struct motorConfig_s {
     uint8_t  motorPwmProtocol;
     uint16_t digitalIdleOffsetValue;
     uint8_t motorPoleCount;                 // Magnetic poles in the motors for calculating actual RPM from eRPM provided by ESC telemetry
+    uint8_t escAutoResult;                  // escAutoResult_e: outcome of the ESC protocol AUTO test
+    uint8_t escAutoTestThrottle;            // % of the throttle range each motor gets during the AUTO test
+    uint16_t escAutoMinCurrent;             // cA: current rise that proves a motor runs on DSHOT600
 } motorConfig_t;
+
+typedef enum {
+    ESC_AUTO_RESULT_UNKNOWN = 0,
+    ESC_AUTO_RESULT_DSHOT600,
+    ESC_AUTO_RESULT_STANDARD,
+} escAutoResult_e;
 
 PG_DECLARE(motorConfig_t, motorConfig);
 
